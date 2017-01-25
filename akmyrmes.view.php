@@ -75,8 +75,14 @@
         }
         
         */
-
-
+        
+        $this->page->begin_block( "akmyrmes_akmyrmes", "playerBoard" );
+        foreach( $players as $player )
+        {
+            $this->page->insert_block( "playerBoard", array( 
+                "PLAYER_NAME" => $player['player_name']
+            ) );
+        }
 
         /*********** Do not change anything below this line  ************/
   	}

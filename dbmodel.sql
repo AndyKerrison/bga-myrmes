@@ -32,4 +32,11 @@
 
 -- Example 2: add a custom field to the standard "player" table
 -- ALTER TABLE `player` ADD `player_my_custom_field` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_nurses` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_soldiers` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_workers` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_larvae` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_food` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_dirt` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_stone` INT UNSIGNED NOT NULL DEFAULT '0';
 

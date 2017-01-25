@@ -26,8 +26,15 @@
 -->
 
 
-This is your game interface. You can edit this HTML in your ".tpl" file.
+<div id="board">
+    
+</div>
 
+<!-- BEGIN playerBoard --> 
+<div>
+    <h2>{PLAYER_NAME}</h2>
+</div>
+<!-- END playerBoard --> 
 
 <script type="text/javascript">
 

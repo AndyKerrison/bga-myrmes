@@ -46,6 +46,12 @@
 
 /********* You can start writing your CSS below this line: **********/
 
+#board {
+    height: 1097px;
+    width: 720px;
+    background-image: url('img/myrboard1.jpg');
+    float: left;
+}
 
 /*
     Example of CSS sprites (a black token and a white token, 20x20px each, embedded in the same "tokens.png" 40x20px image):

@@ -63,13 +63,33 @@ $machinestates = array(
     
     // Note: ID=2 => your first state
 
+    //2 => array(
+    //    "name" => "event",
+    //    "type" => "game",
+    //    "transitions" => array( "" => 5)
+    //),
+    
     2 => array(
-    		"name" => "playerTurn",
-    		"description" => clienttranslate('${actplayer} must play a card or pass'),
-    		"descriptionmyturn" => clienttranslate('${you} must play a card or pass'),
-    		"type" => "activeplayer",
-    		"possibleactions" => array( "playCard", "pass" ),
-    		"transitions" => array( "playCard" => 2, "pass" => 2 )
+        "name" => "births",
+        "type" => "multipleactiveplayer",
+        "args" => "argBirths",
+        "description" => clienttranslate('Everyone must choose their event and births'),
+        "descriptionmyturn" => clienttranslate('Everyone must choose their event and births'),
+        "transitions" => array( "" => 8)
+    ),
+    
+    8 => array(
+        "name" => "checkAvailableWorker",
+        "type" => "game",
+        "action" => "stNextAvailableWorker",
+        "transitions" => array( "worker" => 10, "allWorkersPlaced"=> 30)
+    ),
+    
+    10 => array(
+        "name" => "worker",
+        "type" => "player",
+        "description" => clienttranslate('${actplayer} must place a worker'),
+        "transitions" => array( "" => 8) //there will be more here!
     ),
     
 /*

@@ -33,6 +33,11 @@ class akMyrmes extends Table
         //  the corresponding ID in gameoptions.inc.php.
         // Note: afterwards, you can get/set the global variables with getGameStateValue/setGameStateInitialValue/setGameStateValue
         parent::__construct();self::initGameStateLabels( array( 
+            "current_year"=> 10,
+            "current_season"=> 11,
+            "spring_event"=> 12,
+            "summer_event"=> 13,
+            "fall_event"=> 14
             //    "my_first_global_variable" => 10,
             //    "my_second_global_variable" => 11,
             //      ...
@@ -59,18 +64,23 @@ class akMyrmes extends Table
     protected function setupNewGame( $players, $options = array() )
     {    
         // Set the colors of the players with HTML color code
-        // The default below is red/green/blue/orange/brown
         // The number of colors defined here must correspond to the maximum number of players allowed for the gams
-        $default_colors = array( "ff0000", "008000", "0000ff", "ffa500", "773300" );
+        //Myrmes - red, yellow, blue, black
+        $default_colors = array( "ff0000", "ffff00", "0000ff", "000000" );
  
         // Create players
         // Note: if you added some extra field on "player" table in the database (dbmodel.sql), you can initialize it there.
-        $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar) VALUES ";
+        $nurseCountInitial = 3;
+        $workerCountInitial = 2;
+        $larvaeCountInitial = 1;
+        $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar, player_nurses, player_workers, player_larvae) VALUES ";
         $values = array();
         foreach( $players as $player_id => $player )
         {
+            //each player starts with 3 nurses, 2 workers, 1 larvae
+            //also soldiers 0, colony level 0, food 0, dirt 0, stone 0
             $color = array_shift( $default_colors );
-            $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."')";
+            $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."', '".$nurseCountInitial."', '".$workerCountInitial."', '".$larvaeCountInitial."')";
         }
         $sql .= implode( $values, ',' );
         self::DbQuery( $sql );
@@ -78,20 +88,24 @@ class akMyrmes extends Table
         self::reloadPlayersBasicInfos();
         
         /************ Start the game initialization *****/
-
-        // Init global values with their initial values
-        //self::setGameStateInitialValue( 'my_first_global_variable', 0 );
+        //---------------
+        //--YEAR/SEASON--
+        //---------------
+        $this->setGameStateValue('current_year', 1);
+        $this->setGameStateValue('current_season', 1);       
+        
+        //----------
+        //--EVENTS--
+        //----------
+        $this->rollSeasons();
         
         // Init game statistics
         // (note: statistics used in this file must be defined in your stats.inc.php file)
         //self::initStat( 'table', 'table_teststat1', 0 );    // Init a table statistics
         //self::initStat( 'player', 'player_teststat1', 0 );  // Init a player statistics (for all players)
 
-        // TODO: setup the initial game situation here
-       
-
         // Activate first player (which is in general a good idea :) )
-        $this->activeNextPlayer();
+        //$this->activeNextPlayer();
 
         /************ End of the game initialization *****/
     }
@@ -115,8 +129,10 @@ class akMyrmes extends Table
         // Note: you can retrieve some extra field you added for "player" table in "dbmodel.sql" if you need it.
         $sql = "SELECT player_id id, player_score score FROM player ";
         $result['players'] = self::getCollectionFromDb( $sql );
-  
+ 
         // TODO: Gather all information about current game situation (visible by player $current_player_id).
+        $result['current_year'] = $this->getGameStateValue("current_year");
+        $result['current_season'] = $this->getGameStateValue("current_season");
   
         return $result;
     }
@@ -146,6 +162,11 @@ class akMyrmes extends Table
     /*
         In this space, you can put any utility methods useful for your game logic
     */
+    private function rollSeasons(){
+        $this->setGameStateValue('spring_event', rand(1, 6));
+        $this->setGameStateValue('summer_event', rand(1, 6));
+        $this->setGameStateValue('fall_event', rand(1, 6));        
+    }
 
 
 
@@ -194,23 +215,10 @@ class akMyrmes extends Table
         These methods function is to return some additional information that is specific to the current
         game state.
     */
-
-    /*
     
-    Example for game state "MyGameState":
-    
-    function argMyGameState()
-    {
-        // Get some values from the current game situation in database...
-    
-        // return values:
-        return array(
-            'variable1' => $value1,
-            'variable2' => $value2,
-            ...
-        );
-    }    
-    */
+    function argBirths(){
+        //player needs to know how many nurses they have to birth with
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Game state actions
@@ -220,6 +228,10 @@ class akMyrmes extends Table
         Here, you can create methods defined as "game state actions" (see "action" property in states.inc.php).
         The action method of state X is called everytime the current game state is set to X.
     */
+    
+    function stNextAvailableWorker(){
+        //cycle through players till one has an available workers, or no players remain
+    }
     
     /*
     

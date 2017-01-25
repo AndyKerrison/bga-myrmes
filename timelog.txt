@@ -1,0 +1,2 @@
+24/1/2017 - 1hr - basic setup, git, meta info, etc
+25/1/2017 - 1hr - start on states and setup. start on initial UI
