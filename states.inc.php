@@ -63,33 +63,158 @@ $machinestates = array(
     
     // Note: ID=2 => your first state
 
-    //2 => array(
-    //    "name" => "event",
-    //    "type" => "game",
-    //    "transitions" => array( "" => 5)
-    //),
-    
     2 => array(
+        "name" => "event",
+        "action"=> "stEvent",
+        "type" => "game",
+        "transitions" => array( "" => 5)
+    ),
+    
+    5 => array(
         "name" => "births",
         "type" => "multipleactiveplayer",
+        "action"=> "stBirths",
         "args" => "argBirths",
-        "description" => clienttranslate('Everyone must choose their event and births'),
-        "descriptionmyturn" => clienttranslate('Everyone must choose their event and births'),
+        "description" => clienttranslate('Waiting for other players to choose their event and births'),
+        "descriptionmyturn" => clienttranslate('You must choose your event and births'),
+        "possibleactions" => array( "allocateNurse", "finished" ),
+        "transitions" => array( ""  => 7)
+    ),
+    
+    7 => array(
+        "name" => "processBirths",
+        "description" => clienttranslate('Processing Births...'),
+        "type" => "game",
+        "action" => "stProcessBirths",
         "transitions" => array( "" => 8)
     ),
     
     8 => array(
+        "name" => "initWorkerPhase",
+        "type" => "game",
+        "action" => "stSetFirstPlayerActive",
+        "transitions" => array( "" => 9)
+    ),
+    
+    9 => array(
         "name" => "checkAvailableWorker",
         "type" => "game",
         "action" => "stNextAvailableWorker",
-        "transitions" => array( "worker" => 10, "allWorkersPlaced"=> 30)
+        "transitions" => array( "hasWorker" => 10, "allWorkersPlaced"=> 30)
     ),
     
     10 => array(
-        "name" => "worker",
-        "type" => "player",
+        "name" => "placeWorker",
+        "type" => "activeplayer",
+        "args" => "argPlaceWorker",
         "description" => clienttranslate('${actplayer} must place a worker'),
-        "transitions" => array( "" => 8) //there will be more here!
+        "descriptionmyturn" => clienttranslate('You must place a worker on the board, in your colony, or pass'),
+        "possibleactions" => array( "activateColony", "placeWorker", "pass" ),
+        "transitions" => array("workerPlaced"=> 12, "workerFinished" => 20, "pass" => 11) //there will be more here!
+    ),
+    
+    11 => array(
+        "name" => "workerPass",
+        "type" => "game",
+        "action" => "stWorkerPass",
+        "transitions" => array( "" => 20)
+    ),
+    
+    12 => array(
+        "name" => "moveWorker",
+        "type" => "activeplayer",
+        "args" => "argMoveWorker",
+        "description" => clienttranslate('${actplayer} is moving a worker'),
+        "descriptionmyturn" => clienttranslate('You may move the worker'),
+        "possibleactions" => array("moveWorker", "clearPheromone", "placeTile"),
+        "transitions" => array("workerMoved" => 12, "workerUsed" => 15)        
+    ),
+    
+    15 => array(
+        "name" => "workerUsed",
+        "type" => "game",
+        "action" => "stWorkerUsed",
+        "transitions" => array( "" => 20)
+    ),
+    
+    20 => array(
+        "name" => "workerFinished",
+        "type" => "game",
+        "action" => "stWorkerFinished",
+        "transitions" => array( "" => 9)
+    ),
+    
+    30 => array(
+        "name" => "harvest",
+        "type" => "multipleactiveplayer",
+        "action"=> "stHarvest",
+        //"args" => "argBirths",
+        "description" => clienttranslate('Waiting for other players to choose their harvests'),
+        "descriptionmyturn" => clienttranslate('You must choose your harvest'),
+        "possibleactions" => array( "pass"),
+        "transitions" => array( ""  => 32)
+    ),
+      
+    //here or in state 30? depends if other player results should be hidden
+    31 => array(
+        "name" => "harvestEvaluate",
+        "type" => "game",
+        //"action" => "stAtelierPass",
+        "transitions" => array( "" => 32)
+    ),
+    
+    32 => array(
+        "name" => "initAtelierPhase",
+        "type" => "game",
+        "action" => "stSetFirstPlayerActive",
+        "transitions" => array( "" => 33)
+    ),
+    
+    33 => array(
+        "name" => "checkAvailableNurse",
+        "type" => "game",
+        "action" => "stNextAvailableNurse",
+        "transitions" => array( "hasNurse" => 35, "allNursesPlaced"=> 40)
+    ),
+        
+    35 => array(
+        "name" => "atelier",
+        "type" => "activeplayer",
+        "description" => clienttranslate('${actplayer} must choose an action in the atelier'),
+        "descriptionmyturn" => clienttranslate('You must choose an action in the atelier'),
+        "possibleactions" => array("pass"),
+        "transitions" => array("pass" => 36)
+    ),
+    
+    36 => array(
+        "name" => "atelierPass",
+        "type" => "game",
+        "action" => "stAtelierPass",
+        "transitions" => array( "" => 33)
+    ),
+        
+    40 => array(
+        "name" => "storage",
+        "type" => "multipleactiveplayer",
+        "action" => "stStorage",
+        "description" => clienttranslate('Waiting for other players to discard excess resources'),
+        "descriptionmyturn" => clienttranslate('You must discard excess resources'),
+        "possibleactions" => array( "pass"),
+        "transitions" => array( ""  => 45)        
+    ),
+    
+    45 => array(
+        "name" => "cleanup",
+        "type" => "game",
+        "action" => "stCleanup",
+        "transitions" => array("winter" => 50, "startNextSeason" => 2, "endGame" => 99)
+    ),
+    
+    50 => array(
+        "name" => "winter",
+        "type" => "game",
+        "action" => "stWinter",
+        "transitions" => array("" => 45)
     ),
     
 /*

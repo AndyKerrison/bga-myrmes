@@ -46,6 +46,78 @@
 
 /********* You can start writing your CSS below this line: **********/
 
+.worker {
+    height: 20px;
+    width: 20px;
+    background-color: black;
+    position: absolute;
+}
+
+.tunnel {
+    height: 25px;
+    width: 25px;
+    border: 3px solid white;
+    position: absolute;
+}
+
+.tunnel.red {
+    border-color: red;
+}
+
+.tunnel.blue {
+    border-color: blue;
+}
+
+.tunnel.green {
+    border-color: green;
+}
+
+.tunnel.yellow {
+    border-color: yellow;
+}
+
+.hex {
+    width: 30px;
+    height: 35px;
+    border: 1px solid yellow;
+    color: white;
+}
+
+.iconholder {
+    height: 25px;
+    clear: both;
+}
+
+.iconholder div {
+    float: left;
+    padding-right: 5px;
+}
+
+.currentEvent {
+    border: 2px solid black !important;    
+}
+
+.temp {
+    width: 100px;
+    height: 50px;
+    border: 1px dashed white;
+    float: left;
+}
+
+.active {
+    cursor: pointer;
+    border: 1px dashed green;
+}
+
+.hex.active {
+    border: 3px dashed red;
+}
+
+.allocated {
+    background-color: green;
+}
+
+
 #board {
     height: 1097px;
     width: 720px;

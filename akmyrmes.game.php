@@ -19,6 +19,8 @@
 
 require_once( APP_GAMEMODULE_PATH.'module/table/table.game.php' );
 
+require 'test.inc.php';
+require 'akpathfinding.php';
 
 class akMyrmes extends Table
 {
@@ -33,11 +35,16 @@ class akMyrmes extends Table
         //  the corresponding ID in gameoptions.inc.php.
         // Note: afterwards, you can get/set the global variables with getGameStateValue/setGameStateInitialValue/setGameStateValue
         parent::__construct();self::initGameStateLabels( array( 
+            "state" => 1, //do not ever write to this!
             "current_year"=> 10,
             "current_season"=> 11,
             "spring_event"=> 12,
             "summer_event"=> 13,
-            "fall_event"=> 14
+            "fall_event"=> 14,
+            "first_player"=>15,
+            "active_worker_x"=>16,
+            "active_worker_y"=>17,
+            "active_worker_flag"=>18
             //    "my_first_global_variable" => 10,
             //    "my_second_global_variable" => 11,
             //      ...
@@ -84,15 +91,92 @@ class akMyrmes extends Table
         }
         $sql .= implode( $values, ',' );
         self::DbQuery( $sql );
-        self::reattributeColorsBasedOnPreferences( $players, array(  "ff0000", "008000", "0000ff", "ffa500", "773300" ) );
+        self::reattributeColorsBasedOnPreferences( $players, array(  "ff0000", "ffff00", "0000ff", "000000" ) );
         self::reloadPlayersBasicInfos();
+        $playerData = self::getCollectionFromDb("select player_id, player_color from player");
         
+        //tiles
+        //first, the ones each player has
+        foreach( $playerData as $player_id => $player )
+        {
+            $colorName = "";
+            if ($player['player_color'] == "ff0000")
+            {
+                $colorName = "red";
+            }
+            if ($player['player_color'] == "ffff00")
+            {
+                $colorName = "yellow";
+            }
+            if ($player['player_color'] == "0000ff")
+            {
+                $colorName = "blue";
+            }
+            if ($player['player_color'] == "000000")
+            {
+                $colorName = "black";
+            }
+            
+            foreach( $this->playerTileTypes as $type_id => $tile )
+            {
+                for ($i =0; $i< $tile["count"]; $i++)
+                {
+                    $sql = "INSERT INTO tiles (player_id, type_id, location, color)";
+                    $sql = $sql . " VALUES ('".$player_id."', '".$tile["type"]."', 'storage', '".$colorName."')";
+                    self::DbQuery( $sql );
+                }
+            }
+        }
+        
+        //then the shared ones
+        foreach( $this->sharedTileTypes as $type_id => $tile )
+        {
+            for ($i =0; $i< $tile["count"]; $i++)
+            {
+                $sql = "INSERT INTO tiles (player_id, type_id, location, color)";
+                $sql = $sql . " VALUES (0, ".$tile["type"].", 'storage', '')";
+                self::DbQuery( $sql );
+            }
+        }
+        
+        //each player gets a tunnel at a random available starting location
+        //$startPositions = array();
+        
+        if (count($players) == 2)
+        {
+            $startPositions = $this->startPositions2p;
+        }
+        if (count($players) == 3)
+        {
+            $startPositions = $this->startPositions3p;
+        }
+        if (count($players) == 4)
+        {
+            $startPositions = $this->startPositions4p;
+        }
+        
+        shuffle($startPositions);
+            
+        foreach($players as $player_id => $player )
+        {
+            $startPosition = array_shift($startPositions);
+                
+            $sql = "select tile_id from tiles where type_id = 1 and player_id = '".$player_id."' limit 1";
+            $tunnel = self::getObjectFromDb( $sql );
+
+            $tile_id = $tunnel["tile_id"];
+                
+            $sql = "update tiles set x1 = ".$startPosition["x"].", y1 = ".$startPosition["y"].", location = 'board' where tile_id = ".$tile_id.";";
+            self::DbQuery( $sql );                
+        }            
+                
         /************ Start the game initialization *****/
         //---------------
         //--YEAR/SEASON--
         //---------------
         $this->setGameStateValue('current_year', 1);
         $this->setGameStateValue('current_season', 1);       
+        $this->setGameStateValue('active_worker_flag', 0);
         
         //----------
         //--EVENTS--
@@ -105,8 +189,10 @@ class akMyrmes extends Table
         //self::initStat( 'player', 'player_teststat1', 0 );  // Init a player statistics (for all players)
 
         // Activate first player (which is in general a good idea :) )
-        //$this->activeNextPlayer();
-
+        $this->activeNextPlayer();
+        $active_player_id = self::getActivePlayerId();
+        $this->setGameStateValue('first_player', $active_player_id);
+        
         /************ End of the game initialization *****/
     }
 
@@ -127,12 +213,33 @@ class akMyrmes extends Table
     
         // Get information about players
         // Note: you can retrieve some extra field you added for "player" table in "dbmodel.sql" if you need it.
-        $sql = "SELECT player_id id, player_score score FROM player ";
+        $sql = "SELECT player_id id, player_color color, player_colony_level colony, player_score score, player_nurses nurses, player_larvae larvae, player_soldiers soldiers, player_workers workers, player_food food, player_stone stone, player_dirt dirt FROM player ";
         $result['players'] = self::getCollectionFromDb( $sql );
  
-        // TODO: Gather all information about current game situation (visible by player $current_player_id).
+        //Gather all information about current game situation (visible by player $current_player_id).
         $result['current_year'] = $this->getGameStateValue("current_year");
         $result['current_season'] = $this->getGameStateValue("current_season");
+        
+        //the hex info needs to be in a form more suitable for js
+        $hexInfo = array();
+        
+        $sql = "SELECT tile_id, color, x1, y1 from tiles where location='board' and type_id='1'";
+        $result['tunnels'] = self::getObjectListFromDB( $sql );
+        
+        if ($this->getGameStateValue("active_worker_flag")== 1)
+        {
+            $result['activeWorker'] = array(
+                "x"=>$this->getGameStateValue("active_worker_x"),
+                "y"=>$this->getGameStateValue("active_worker_y"),
+                );
+        }
+            
+            
+        //TODO - return which birthing choices this player has made (if appropriate?)
+                
+        //$hexInfo['key'] = 'value';
+        
+        //$result['hex_info'] = $this->hexInfo;
   
         return $result;
     }
@@ -162,11 +269,280 @@ class akMyrmes extends Table
     /*
         In this space, you can put any utility methods useful for your game logic
     */
+    
+    private function incPlayerVariable($varName, $playerId, $increment)
+    {
+        $value = $this->getPlayerVariable($varName, $playerId);
+        $value += $increment;
+        $this->setPlayerVariable($varName, $playerId, $value);
+    }
+    
+    private function getPlayerVariable($varName, $playerId)
+    {
+        $sql = "SELECT 0, ".$varName." FROM player where player_id = '".$playerId."'";
+        $player = self::getCollectionFromDb( $sql );
+        return $player[0][$varName];
+    }
+
+    private function setPlayerVariable($varName, $playerId, $newValue)
+    {
+        $sql = "update player set ".$varName." = '".$newValue."' where player_id = '".$playerId."'";
+        self::DbQuery( $sql );
+    }
+    
+    private function playerSubtractScore($playerId, $loss)
+    {
+        $sql = "update player set player_score = player_score - ".$loss." where player_id = '".$playerId."'";
+        self::DbQuery( $sql );
+    }
+    
     private function rollSeasons(){
         $this->setGameStateValue('spring_event', rand(1, 6));
         $this->setGameStateValue('summer_event', rand(1, 6));
         $this->setGameStateValue('fall_event', rand(1, 6));        
     }
+    
+    private function getCurrentEvent(){
+        $currentEvent = 0;
+        $season = $this->getGameStateValue('current_season');
+        
+        if ($season == 1)
+        {
+            $currentEvent = $this->getGameStateValue('spring_event');
+        }
+        else if ($season == 2)
+        {
+            $currentEvent = $this->getGameStateValue('summer_event');
+        }
+        else if ($season == 3)
+        {
+            $currentEvent = $this->getGameStateValue('fall_event');
+        }
+        else
+        {
+            throw new feException("Invalid season " . $season);            
+        }
+        return $currentEvent;
+    }
+    
+    private function getAvailableNurses($playerID)
+    {
+        $availableNurses = $this->getPlayerVariable('player_atelier_1_allocated', $playerID);
+        $availableNurses += $this->getPlayerVariable('player_atelier_2_allocated', $playerID);
+        $availableNurses += $this->getPlayerVariable('player_atelier_3_allocated', $playerID);
+        $availableNurses += $this->getPlayerVariable('player_atelier_4_allocated', $playerID);        
+        
+        return $availableNurses;
+    }
+    
+    private function getAvailableWorkers($playerID)
+    {
+        $availableWorkers = $this->getPlayerVariable('player_workers', $playerID);
+        $passedWorkers = $this->getPlayerVariable('player_workers_passed', $playerID);
+        
+        $availableWorkers -= $passedWorkers;
+        
+        $colonyUsed = $this->getPlayerVariable('player_colony_used', $playerID);//1,2,4,8
+        
+        if ($colonyUsed >= 8)
+        {
+            $colonyUsed -=8;
+            $availableWorkers--;
+        }
+        if ($colonyUsed >= 4)
+        {
+            $colonyUsed -=4;
+            $availableWorkers--;
+        }
+        if ($colonyUsed >= 2)
+        {
+            $colonyUsed -=2;
+            $availableWorkers--;
+        }
+        if ($colonyUsed >= 1)
+        {
+            $colonyUsed -=1;
+            $availableWorkers--;
+        }
+        return $availableWorkers;
+    }
+    
+    private function setFirstPlayerActive(){
+        $firstPlayer = $this->getGameStateValue('first_player');
+        
+        $this->activeNextPlayer();
+        $activePlayerID = self::getActivePlayerId();
+        
+               
+        while ($firstPlayer != $activePlayerID)
+        {
+            $this->activeNextPlayer();
+            $activePlayerID = self::getActivePlayerId();
+        }
+    }
+    
+    private function getPlayerAllocations($playerID) {
+        
+        $sql = "SELECT * FROM player where player_id = '".$playerID."'";
+        $player = self::getObjectFromDB( $sql );
+        
+        $private = array();
+        
+        $private['allocated'] = array();
+        $private['can_allocate'] = array();
+        $private['can_deallocate'] = array();
+        
+        $currentEvent = $this->getCurrentEvent();
+        $selectedEvent = $player['player_event_selected'];
+        $larvae = $player['player_larvae'];
+        array_push($private['allocated'], 'event_'.$selectedEvent);
+        for ($i =0; $i<=7; $i++)
+        {
+            if ($i == $selectedEvent)
+            {
+                continue;
+            }
+            if (($currentEvent + $larvae) >= $i && ($currentEvent - $larvae) <= $i)
+            {
+                array_push($private['can_allocate'], 'event_'.$i);
+            }
+        }
+                
+                    
+        $totalNurses = $player['player_nurses'];
+        $availableNurses = $totalNurses;
+        $larvaeAllocated = $player['player_larvae_slots_allocated'];
+        $soldiersAllocated = $player['player_soldier_slots_allocated'];
+        $workersAllocated = $player['player_worker_slots_allocated'];
+        $atelier1Allocated = $player['player_atelier_1_allocated'];
+        $atelier2Allocated = $player['player_atelier_2_allocated'];
+        $atelier3Allocated = $player['player_atelier_3_allocated'];
+        $atelier4Allocated = $player['player_atelier_4_allocated'];
+            
+        $availableNurses -= $larvaeAllocated;                    
+        $availableNurses -= $soldiersAllocated;                    
+        $availableNurses -= $workersAllocated;                    
+        $availableNurses -= $atelier1Allocated;                    
+        $availableNurses -= $atelier2Allocated;                    
+        $availableNurses -= $atelier3Allocated;                    
+        $availableNurses -= $atelier4Allocated;                    
+        
+        $private['available_nurses'] = $availableNurses;                    
+        
+        if ($larvaeAllocated == 0 && $availableNurses >= 1)
+        {
+            array_push($private['can_allocate'], 'larvae_1');                
+        }
+        if ($larvaeAllocated == 1)
+        {
+            array_push($private['allocated'], 'larvae_1');                
+            array_push($private['can_deallocate'], 'larvae_1');
+            if ($availableNurses >= 1)
+            {
+                array_push($private['can_allocate'], 'larvae_2');
+            }
+        }
+        if ($larvaeAllocated == 2)
+        {
+            array_push($private['allocated'], 'larvae_1');
+            array_push($private['allocated'], 'larvae_2');                                
+            array_push($private['can_deallocate'], 'larvae_2');
+            if ($availableNurses >= 1)
+            {
+                array_push($private['can_allocate'], 'larvae_3');
+            }
+        }
+        if ($larvaeAllocated == 3)
+        {
+            array_push($private['allocated'], 'larvae_1');                
+            array_push($private['allocated'], 'larvae_2');                
+            array_push($private['allocated'], 'larvae_3');                
+            array_push($private['can_deallocate'], 'larvae_3');
+        }
+        
+        if($soldiersAllocated == 0 && $availableNurses >= 2)
+        {
+            array_push($private['can_allocate'], 'soldier_1');
+        }
+        if($soldiersAllocated == 2)
+        {
+            array_push($private['allocated'], 'soldier_1');                
+            array_push($private['can_deallocate'], 'soldier_1');
+            if ($availableNurses >= 1)
+            {
+                array_push($private['can_allocate'], 'soldier_2');
+            }
+        }
+        if($soldiersAllocated == 3)
+        {
+            array_push($private['allocated'], 'soldier_1');                
+            array_push($private['allocated'], 'soldier_2');                
+            array_push($private['can_deallocate'], 'soldier_2');
+        }
+        
+        if($workersAllocated == 0 && $availableNurses >= 2)
+        {
+            array_push($private['can_allocate'], 'worker_1');
+        }
+        if($workersAllocated == 2)
+        {
+            array_push($private['allocated'], 'worker_1');                
+            array_push($private['can_deallocate'], 'worker_1');
+            if ($availableNurses >= 2)
+            {
+                array_push($private['can_allocate'], 'worker_2');
+            }
+        }
+        if($workersAllocated == 4)
+        {
+            array_push($private['allocated'], 'worker_1');                
+            array_push($private['allocated'], 'worker_2');                
+            array_push($private['can_deallocate'], 'worker_2');
+        }
+        
+        if ($atelier1Allocated == 0 && $availableNurses >= 1)
+        {
+            array_push($private['can_allocate'], 'atelier_1');
+        }
+        if ($atelier1Allocated == 1)
+        {
+            array_push($private['allocated'], 'atelier_1');
+            array_push($private['can_deallocate'], 'atelier_1');
+        }
+        
+        if ($atelier2Allocated == 0 && $availableNurses >= 1)
+        {
+            array_push($private['can_allocate'], 'atelier_2');
+        }
+        if ($atelier2Allocated == 1)
+        {
+            array_push($private['allocated'], 'atelier_2');
+            array_push($private['can_deallocate'], 'atelier_2');
+        }
+        
+        if ($atelier3Allocated == 0 && $availableNurses >= 1)
+        {
+            array_push($private['can_allocate'], 'atelier_3');
+        }
+        if ($atelier3Allocated == 1)
+        {
+            array_push($private['allocated'], 'atelier_3');
+            array_push($private['can_deallocate'], 'atelier_3');
+        }
+        
+        if ($atelier4Allocated == 0 && $availableNurses >= 1)
+        {
+            array_push($private['can_allocate'], 'atelier_4');
+        }
+        if ($atelier4Allocated == 1)
+        {
+            array_push($private['allocated'], 'atelier_4');
+            array_push($private['can_deallocate'], 'atelier_4');
+        }
+        
+        return $private;
+    }
+    
 
 
 
@@ -178,6 +554,271 @@ class akMyrmes extends Table
         Each time a player is doing some game action, one of the methods below is called.
         (note: each method below must match an input method in akmyrmes.action.php)
     */
+    
+    function onHexClicked($x, $y)
+    {
+        //check valid
+        $hex = "hex_".$x."_".$y;
+        
+        $currentState = $this->getGameStateValue("state");
+        
+        if ($currentState != "10" && $currentState != "12")
+        {
+            throw new feException("Unexpected hex click state ".$currentState);
+        }
+        
+        //place worker state. Must have chosen a tunnel
+        if ($currentState == "10")
+        {
+            $args = $this->argPlaceWorker();
+            if (!in_array($hex, $args["tunnels"]))
+            {
+                throw new feException("Invalid tunnel choice ".$hex);
+            }
+            
+            //okay! mark this hex has having an active worker of this colour. (how?)
+            $this->setGameStateValue("active_worker_flag", 1);
+            $this->setGameStateValue("active_worker_x", $x);
+            $this->setGameStateValue("active_worker_y", $y);
+            
+            //TODO - place a worker on the board (move it from player's board if possible)
+            //TODO - make sure that reloading immediately after this state adds the worker
+            //to the board
+            self::notifyAllPlayers( "workerPlaced", clienttranslate( '${player_name} places a worker on a colony entrance' ), array(
+                'player_id' => self::getActivePlayerId(),
+                'player_name' => self::getActivePlayerName(),
+                'x' => $x,
+                'y' => $y,
+                ));
+            
+            $this->gamestate->nextstate("workerPlaced");
+            return;
+        }
+        
+        if ($currentState == "12")
+        {
+            $args = $this->argMoveWorker();
+            if (!in_array($hex, $args["validMoves"]))
+            {
+                throw new feException("Invalid hex choice ".$hex);
+            }
+            
+            //okay! mark this hex has having an active worker of this colour. (how?)
+            $this->setGameStateValue("active_worker_flag", 1);
+            $this->setGameStateValue("active_worker_x", $x);
+            $this->setGameStateValue("active_worker_y", $y);
+            
+            //TODO - place a worker on the board (move it from player's board if possible)
+            //TODO - make sure that reloading immediately after this state adds the worker
+            //to the board
+            self::notifyAllPlayers( "workerMoved", clienttranslate( '${player_name} moves a worker' ), array(
+                'player_id' => self::getActivePlayerId(),
+                'player_name' => self::getActivePlayerName(),
+                'x' => $x,
+                'y' => $y,
+                ));
+            
+            $this->gamestate->nextstate("workerMoved");
+            return;
+        }
+        
+        throw new feException("Unhandled hex click state ".$currentState);        
+    }
+    
+    function onActivateColony($slot){
+        //check valid
+        //mark as used
+        //give appropriate bonus (notify other players)
+        //move to next worker
+        
+        //check valid
+        $validMoves = $this->argPlaceWorker();
+        $colonyStr = "colony_".$slot;
+        
+        if (!in_array($colonyStr, $validMoves["availableColony"]))
+        {
+            throw new feException("Invalid selection ".$colonyStr);
+        }
+        
+        //mark used
+        $colonyUsed = $this->getPlayerVariable("player_colony_used", self::getActivePlayerId());
+        $colonyUsed += 2*($slot)+1;
+        $this->setPlayerVariable("player_colony_used", self::getActivePlayerId(), $colonyUsed);
+        
+        //give bonus + notify
+        switch($slot)
+        {
+            case "0":
+                $rescount = 1;
+                $resname = $this->resourceNames["larvae"];
+                $this->incPlayerVariable("player_larvae", self::getActivePlayerId(), 1);
+                break;
+            case "1":
+                $rescount = 1;
+                $resname = $this->resourceNames["food"];
+                $this->incPlayerVariable("player_food", self::getActivePlayerId(), 1);
+                break;
+            case "2a":
+                $rescount = 1;
+                $resname = $this->resourceNames["stone"];
+                $this->incPlayerVariable("player_stone", self::getActivePlayerId(), 1);
+                break;
+            case "2b":
+                $rescount = 1;
+                $resname = $this->resourceNames["dirt"];
+                $this->incPlayerVariable("player_dirt", self::getActivePlayerId(), 1);
+                break;
+            case "3":
+                $rescount = 2;
+                $resname = $this->resourceNames["vp"];
+                //todo - validate food and different notification maybe?
+                $this->incPlayerVariable("player_food", self::getActivePlayerId(), -1);
+                $this->incPlayerVariable("player_score", self::getActivePlayerId(), 2);
+                break;
+            default:
+                throw new feException("Invalid colony slot ". $slot);
+        }
+                
+        self::notifyAllPlayers( "colonyActivated", clienttranslate( '${player_name} activates colony level ${slot} and gains ${num} ${resname}' ), array(
+            'player_id' => self::getActivePlayerId(),
+            'player_name' => self::getActivePlayerName(),
+            'slot' => $slot,
+            'num' => $rescount,
+            'resname' => $resname
+        ) );
+        
+        //next worker
+        $this->gamestate->nextState("workerFinished");
+    }
+    
+    function allocateNurse($type, $slot){
+        
+        $currentPlayerID = self::getCurrentPlayerId();
+                
+        $allocations = $this->getPlayerAllocations($currentPlayerID);
+        $identifier = $type . "_" . $slot;
+        
+        if (in_array($identifier, $allocations['can_allocate']))
+        {
+            if ($type == "larvae") {
+                $this->setPlayerVariable("player_larvae_slots_allocated", $currentPlayerID, $slot);
+            }
+            else if ($type == "soldier" && $slot == 1) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 2);
+            }
+            else if ($type == "soldier" && $slot == 2) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 3);
+            }
+            else if ($type == "worker" && $slot == 1) {
+                $this->setPlayerVariable("player_worker_slots_allocated", $currentPlayerID, 2);
+            }
+            else if ($type == "worker" && $slot == 2) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 4);
+            }
+            else if ($type == "atelier" && $slot == 1) {
+                $this->setPlayerVariable("player_atelier_1_allocated", $currentPlayerID, 1);
+            }
+            else if ($type == "atelier" && $slot == 2) {
+                $this->setPlayerVariable("player_atelier_2_allocated", $currentPlayerID, 1);
+            }
+            else if ($type == "atelier" && $slot == 3) {
+                $this->setPlayerVariable("player_atelier_3_allocated", $currentPlayerID, 1);
+            }
+            else if ($type == "atelier" && $slot == 4) {
+                $this->setPlayerVariable("player_atelier_4_allocated", $currentPlayerID, 1);
+            }
+            else if ($type == "event") {
+                $this->setPlayerVariable("player_event_selected", $currentPlayerID, $slot);
+            }
+            else
+            {
+                throw new feExcepton("Unrecognised identifier: " + $identifier);
+            }
+        }
+        else if (in_array($identifier, $allocations['can_deallocate']))
+        {
+            if ($type == "larvae") {
+                $this->setPlayerVariable("player_larvae_slots_allocated", $currentPlayerID, ($slot-1));
+            }
+            else if ($type == "soldier" && $slot == 1) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 0);
+            }
+            else if ($type == "soldier" && $slot == 2) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 2);
+            }
+            else if ($type == "worker" && $slot == 1) {
+                $this->setPlayerVariable("player_worker_slots_allocated", $currentPlayerID, 0);
+            }
+            else if ($type == "worker" && $slot == 2) {
+                $this->setPlayerVariable("player_soldier_slots_allocated", $currentPlayerID, 2);
+            }
+            else if ($type == "atelier" && $slot == 1) {
+                $this->setPlayerVariable("player_atelier_1_allocated", $currentPlayerID, 0);
+            }
+            else if ($type == "atelier" && $slot == 2) {
+                $this->setPlayerVariable("player_atelier_2_allocated", $currentPlayerID, 0);
+            }
+            else if ($type == "atelier" && $slot == 3) {
+                $this->setPlayerVariable("player_atelier_3_allocated", $currentPlayerID, 0);
+            }
+            else if ($type == "atelier" && $slot == 4) {
+                $this->setPlayerVariable("player_atelier_4_allocated", $currentPlayerID, 0);
+            }
+            else
+            {
+                throw new feExcepton("Unrecognised identifier: " + $identifier);
+            }
+        }
+        else {
+            throw new feExcepton("Unmatched identifier: " + $identifier);
+        }
+        
+        
+        $allocations = $this->getPlayerAllocations($currentPlayerID);
+                          
+        self::notifyPlayer( self::getCurrentPlayerId(), "allocationConfirmed", "", 
+            $allocations
+        );        
+    }
+    
+    function harvestChosen(){
+        $currentPlayerID = self::getCurrentPlayerId();
+        $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");
+    }
+    
+    function storageChosen(){
+        $currentPlayerID = self::getCurrentPlayerId();
+        $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");
+    }
+    
+    function allocateNurseFinished(){
+        
+        //todo - notify all players who has finished, might encourage them to speed up
+        //also, when this notification gets to the active player, deactivate their stuff
+        
+        $currentPlayerID = self::getCurrentPlayerId();
+                      
+        self::notifyPlayer( self::getCurrentPlayerId(), "yourNursesAllocated", "", 
+            array()
+        );
+        
+        // Notify all players about the card played
+        self::notifyAllPlayers( "nursesAllocated", clienttranslate( '${player_name} has chosen an event and finished allocating nurses' ), array(
+            'player_name' => self::getCurrentPlayerName()
+        ) );
+        
+        $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");        
+    }
+    
+    function pass(){
+        
+        $test = akUtils::getPlayerVariable('player_nurses', self::getCurrentPlayerId());
+        var_dump($test);
+        die('ok');        
+        
+        
+        $this->gamestate->nextstate("pass");             
+    }
 
     /*
     
@@ -216,8 +857,101 @@ class akMyrmes extends Table
         game state.
     */
     
+    function argMoveWorker(){
+        //will depend on the current worker's location, blocked tiles, etc.
+        //This one will be complicated.
+        //If on an empty hex, can move to an adjacent hex
+        //If on a special tile, can move to any hex adjacent to any space on the pheromone
+        //TODO - check on boiteajeux about moving on specil tiles and opposition special tiles.
+        //Can't move through water
+        //Can't move off board
+        //Can't move onto enemy tunnels
+        //Can't move onto enemy tiles UNLESS player has a soldier
+        //Can't move onto bugs UNLESS enough soldiers are present
+        
+        $x = $this->getGameStateValue("active_worker_x");
+        $y = $this->getGameStateValue("active_worker_y");
+                      
+        $searchNodeData = new MyrmesHexGrid($this->boardSpaces);
+               
+        $result = array();
+        $result["validMoves"] = array();
+        
+        $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
+        
+        foreach($moves as $move)
+        {
+            $result["validMoves"][] = "hex_".$move->X."_".$move->Y;
+        }
+        
+        return $result;
+    }
+    
+    function argPlaceWorker() {
+        //valid spots are UNOCCUPIED colony levels, and starting tunnels belonging to this player
+        $player_id = self::getActivePlayerId();
+        $colonyUsed = $this->getPlayerVariable('player_colony_used', $player_id);
+        $colonyLevel = $this->getPlayerVariable('player_colony_level', $player_id);
+        
+        $result['availableColony'] = array();
+        if ($colonyUsed % 2 < 1)
+        {
+            $result['availableColony'][] = 'colony_0';
+        }
+        if ($colonyUsed % 4 < 2 && $colonyLevel >= 1 )
+        {
+            $result['availableColony'][] = 'colony_1';
+        }
+        if ($colonyUsed % 8 < 4 && $colonyLevel >= 2 )
+        {
+            $result['availableColony'][] = 'colony_2a';
+            $result['availableColony'][] = 'colony_2b';
+        }
+        if ($colonyUsed  < 8 && $colonyLevel >= 3)
+        {
+            $result['availableColony'][] = 'colony_3';
+        }
+        
+        //now get the tunnels
+        $sql = "select tile_id, x1, y1 from tiles where type_id = 1 and location='board' and player_id = '".$player_id."'";
+        $tunnels = self::getObjectListFromDb( $sql );
+        
+        $result["tunnels"] = array();
+        foreach($tunnels as $tunnel)
+        {
+            //todo - maybe some hex ids?
+            $result["tunnels"][] = "hex_".$tunnel["x1"]."_".$tunnel["y1"];
+        }
+        
+        return $result;
+    }
+    
     function argBirths(){
-        //player needs to know how many nurses they have to birth with
+        
+        //get the event
+        $current_event = 0;
+        if ($this->getGameStateValue("current_season") == 1)
+            $current_event = $this->getGameStateValue("spring_event");
+        else if ($this->getGameStateValue("current_season") == 2)
+            $current_event = $this->getGameStateValue("summer_event");
+        else if ($this->getGameStateValue("current_season") == 3)
+            $current_event = $this->getGameStateValue("fall_event");        
+        
+        $privateInfos = array();
+        
+        //calculate which slots the player can allocate, and which slots they can deallocate
+        //return only this list
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            $private = $this->getPlayerAllocations($player['player_id']);
+                        
+            $privateInfos[$player['player_id']] = $private;
+        }
+                
+        return array("event" => $current_event, "_private" => $privateInfos);
     }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -229,22 +963,401 @@ class akMyrmes extends Table
         The action method of state X is called everytime the current game state is set to X.
     */
     
-    function stNextAvailableWorker(){
-        //cycle through players till one has an available workers, or no players remain
+    function stWorkerFinished()
+    {
+        $this->activeNextPlayer();
+        $this->gamestate->nextState("");
     }
     
-    /*
-    
-    Example for game state "MyGameState":
-
-    function stMyGameState()
-    {
-        // Do some stuff ...
+    function stWorkerUsed(){
+        //TODO
+        //remove a worker from the active player. Make sure this updates in all UIs and current
+        //game state.
         
-        // (very often) go to another gamestate
-        $this->gamestate->nextState( 'some_gamestate_transition' );
-    }    
-    */
+        $this->gamestate->nextState("");
+    }
+    
+    function stWorkerPass(){
+        $passedWorkers = $this->getPlayerVariable('player_workers_passed', self::getActivePlayerId());
+        $passedWorkers++;
+        $this->setPlayerVariable('player_workers_passed', self::getActivePlayerId(), $passedWorkers);
+        
+        self::notifyAllPlayers( "workerPass", clienttranslate( '${player_name} passes' ), array(
+                'player_name' => $this->getPlayerVariable('player_name', self::getActivePlayerId())
+        ) ); 
+        
+        $this->gamestate->nextstate('');
+    }
+    
+    function stAtelierPass(){
+        
+        self::notifyAllPlayers( "nursePass", clienttranslate( '${player_name} passes further atelier actions' ), array(
+                'player_name' => $this->getPlayerVariable('player_name', self::getActivePlayerId())
+        ) ); 
+        
+        //TODO - move stuff on interface?
+        $this->setPlayerVariable('player_atelier_1_allocated', self::getActivePlayerId(), 0);
+        $this->setPlayerVariable('player_atelier_2_allocated', self::getActivePlayerId(), 0);
+        $this->setPlayerVariable('player_atelier_3_allocated', self::getActivePlayerId(), 0);
+        $this->setPlayerVariable('player_atelier_4_allocated', self::getActivePlayerId(), 0);
+        
+        
+        //unlike worker phase, we don't switch to next player after each place/pass
+        //because if you have more nurses, you do them all one after another
+        //although this doesn't matter when you pass anyway.
+                
+        $this->gamestate->nextstate('');
+    }
+    
+    function stEvent(){
+        //entering the event state, set all players to the current event
+        $currentEvent = $this->getCurrentEvent();      
+        
+        $players = self::loadPlayersBasicInfos();
+        foreach($players as $player)
+        {
+            $this->setPlayerVariable("player_event_selected", $player['player_id'], $currentEvent);
+        }
+        
+        $currentYear = $this->getGameStateValue('current_year');
+        $currentSeason = $this->getGameStateValue('current_season');
+        
+        self::notifyAllPlayers( "season", clienttranslate( 'SEASON ${season} of year ${year}. The event is ${eventname}' ), array(
+            'year' => $currentYear,
+            'season'=>$currentSeason,
+            'eventname'=>"EVENTNAME"
+        ) ); 
+                
+        $this->gamestate->nextstate('');
+    }
+    
+    function stProcessBirths(){
+        //give everybody new ants!
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        
+        $baseEvent = $this->getCurrentEvent();
+        
+        foreach($players as $player)
+        {
+            //reduce larvae for event
+            $chosenEvent = $this->getPlayerVariable('player_event_selected', $player['player_id']);
+            
+            $larvae = $player['player_larvae'];
+            $spent = abs($baseEvent - $chosenEvent);
+            $larvae -= $spent;
+            $this->setPlayerVariable('player_larvae', $player['player_id'], $larvae);
+
+            
+            //birth larvae
+            $larvaeAllocated = $player['player_larvae_slots_allocated'];
+            $larvaeGain = 0;
+            if ($larvaeAllocated == 1)
+            {
+                $larvaeGain = 1;
+            }
+            if ($larvaeAllocated == 2)
+            {
+                $larvaeGain = 3;
+            }
+            if ($larvaeAllocated == 3)
+            {
+                $larvaeGain = 5;
+            }
+            if ($larvaeGain > 0 && $chosenEvent == 2) //TODO - use constant
+            {
+                $larvaeGain += 2;
+            }
+            
+            $larvae += $larvaeGain;
+            $this->setPlayerVariable('player_larvae', $player['player_id'], $larvae);
+                        
+            
+            //birth soldiers
+            $soldiers = $player['player_soldiers'];
+            $soldiersAllocated = $player['player_soldier_slots_allocated'];
+            $soldierGain = 0;
+            if ($soldiersAllocated == 2)
+            {
+                $soldierGain = 1;
+            }
+            if ($soldiersAllocated == 3)
+            {
+                $soldierGain = 2;
+            }
+            if ($soldierGain > 0 && $chosenEvent == 5) //TODO - use constant
+            {
+                $soldierGain += 1;
+            }
+            
+            $soldiers += $soldierGain;
+            $this->setPlayerVariable('player_soldiers', $player['player_id'], $soldiers);
+            
+            
+            //birth workers
+            $workers = $player['player_workers'];
+            $workersAllocated = $player['player_worker_slots_allocated'];
+            $workerGain = 0;
+            if ($workersAllocated == 2)
+            {
+                $workerGain = 1;
+            }
+            if ($workersAllocated == 4)
+            {
+                $workerGain = 2;
+            }
+            if ($workerGain > 0 && $chosenEvent == 7) //TODO - use constant
+            {
+                $workerGain += 1;
+            }
+            
+            $workers += $workerGain;
+            $this->setPlayerVariable('player_workers', $player['player_id'], $workers);
+                       
+            
+            //sent to atelier        
+            $atelier1 = $player['player_atelier_1_allocated'];
+            $atelier2 = $player['player_atelier_2_allocated'];
+            $atelier3 = $player['player_atelier_3_allocated'];
+            $atelier4 = $player['player_atelier_4_allocated'];
+            $atelierCount = $atelier1 + $atelier2 + $atelier3 + $atelier4; 
+            
+            //notifications
+            self::notifyAllPlayers( "eventChosen", clienttranslate( '${player_name} spends ${spent} larvae to trigger event ${eventName}' ), array(
+                'player_name' => $player['player_name'],
+                'spent' => $spent,
+                'eventName' => "SOME EVENT HERE",
+                'larvaeCount' => $larvae
+            ) );
+            
+            self::notifyAllPlayers( "birthLarvae", clienttranslate( '${player_name} births ${larvaeGain} larvae, ${soldierGain} soldiers, and ${workerGain} workers' ), array(
+                'player_name' => $player['player_name'],
+                'larvaeGain' => $larvaeGain,            
+                'larvaeCount' => $larvae,
+                'soldierGain' => $soldierGain,            
+                'soldierCount' => $soldiers,
+                'workerGain' => $workerGain,            
+                'workerCount' => $workers
+            ) );
+            
+            self::notifyAllPlayers( "atelierAllocation", clienttranslate( '${player_name} sends ${atelierCount} nurses to the atelier' ), array(
+                'player_name' => $player['player_name'],
+                'atelierCount' => $atelierCount
+            ) ); 
+        }
+        
+        $this->gamestate->nextstate('');
+    }
+    
+    function stBirths(){
+        //entering the births state, set all players active
+        $this->gamestate->setAllPlayersMultiactive();
+    }
+    
+    function stHarvest(){
+        //entering the births state, set all players active
+        $this->gamestate->setAllPlayersMultiactive();
+    }
+    
+    function stStorage(){
+        //entering the births state, set all players active
+        $this->gamestate->setAllPlayersMultiactive();
+    }
+    
+    function stNextAvailableNurse(){
+        //does this player have an available nurse?
+        //if yes, take a turn. Otherwise cycle through other players and check
+        //if no players have available workers, we are finished.
+        
+        $initialPlayerID = self::getActivePlayerId();
+        $availableNurses = $this->getAvailableNurses($initialPlayerID);
+       
+        while($availableNurses == 0)
+        {
+            self::notifyAllPlayers( "noNurse", clienttranslate( '${player_name} has no nurses to place in the atelier' ), array(
+                'player_name' => self::getActivePlayerName()
+            ) );
+                    
+            $this->activeNextPlayer();
+            $activePlayerID = self::getActivePlayerId();
+            $availableNurses = $this->getAvailableNurses($activePlayerID);
+            
+            //if we are back to the initial player and still no nurses, we are done
+            if ($activePlayerID == $initialPlayerID && $availableNurses == 0)
+            {
+                self::notifyAllPlayers( "noNurse", clienttranslate( 'All nurses have been placed' ), array(
+                ) );
+                
+                $this->gamestate->nextstate('allNursesPlaced');
+                return;
+            }
+        }
+                        
+        $this->gamestate->nextstate('hasNurse');        
+    }
+    
+    function stNextAvailableWorker(){
+        
+        //does this player have an available worker?
+        //if yes, take a turn. Otherwise cycle through other players and check
+        //if no players have available workers, we are finished.
+        
+        $initialPlayerID = self::getActivePlayerId();
+        $availableWorkers = $this->getAvailableWorkers($initialPlayerID);
+       
+        while($availableWorkers == 0)
+        {
+            self::notifyAllPlayers( "noWorker", clienttranslate( '${player_name} has no workers left to place' ), array(
+                'player_name' => self::getActivePlayerName()
+            ) );
+                    
+            $this->activeNextPlayer();
+            $activePlayerID = self::getActivePlayerId();
+            $availableWorkers = $this->getAvailableWorkers($activePlayerID);
+            
+            //if we are back to the initial player and still no workers, we are done
+            if ($activePlayerID == $initialPlayerID && $availableWorkers == 0)
+            {
+                self::notifyAllPlayers( "noWorker", clienttranslate( 'All workers have been placed' ), array(
+                ) );
+                
+                $this->gamestate->nextstate('allWorkersPlaced');
+                return;
+            }
+        }
+                        
+        $this->gamestate->nextstate('hasWorker');
+    }
+    
+    function stSetFirstPlayerActive() {
+        $this->setFirstPlayerActive();
+        
+        $this->gamestate->nextstate("");
+    }
+    
+    function stWinter(){
+        //in winter, each player must feed
+        //Food required = year + 3 - soldiers (to a min of zero)
+        //-3vp per missing food
+        
+        $currentYear = $this->getGameStateValue('current_year');
+        
+        self::notifyAllPlayers( "winter", clienttranslate( 'Winter of year ${year}. Each player requires ${food} food for their colony' ), array(
+            'year' => $currentYear,
+            'food'=>$currentYear + 3,
+        ) );                       
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            $soldiers = (int)$player['player_soldiers'];
+            $foodRequired = 3 + $currentYear - $soldiers;
+            $foodAvailable = (int)$player['player_food'];
+            if ($foodRequired < 0)
+            {
+                $foodRequired = 0;
+            }
+            
+            if ($foodRequired <= $foodAvailable)
+            {
+                $foodAvailable -= $foodRequired;
+                $this->setPlayerVariable('player_food', $player['player_id'], $foodAvailable);
+                
+                self::notifyAllPlayers( "colonyFed", clienttranslate( '${player_name} spent ${spent} food (${soldiers} soldiers)' ), array(
+                    'player_name' => self::getActivePlayerName(),
+                    'spent' => $foodRequired,    
+                    'soldiers'=>$soldiers
+                ) );       
+            } 
+            else
+            {
+                $this->setPlayerVariable('player_food', $player['player_id'], 0);
+                $vploss = ($foodRequired - $foodAvailable)*3;
+                
+                $this->playerSubtractScore($player['player_id'], $vploss);
+                
+                self::notifyAllPlayers( "colonyFed", clienttranslate( '${player_name} only has ${spent} food (${soldiers} soldiers) and loses ${vploss} VP' ), array(
+                    'player_name' => self::getActivePlayerName(),
+                    'spent' => $foodAvailable,    
+                    'soldiers' => $soldiers,
+                    'vploss' => $vploss                    
+                ) );                       
+            }
+        }
+        
+        $this->gamestate->nextstate('');
+    }
+    
+    function stCleanup()
+    {
+        //do all end of turn cleanup stuff, and then either end the game or
+        //advance the season.
+        
+        //return workers from colony
+        //return nurses to board
+        //move start player left
+        //advance season
+        
+        //return workers from colony
+        $sql = "update player set player_colony_used = 0";
+        self::DbQuery( $sql );
+        
+        //return nurses to board
+        $sql = "update player set player_larvae_slots_allocated = 0,"
+                . " player_worker_slots_allocated = 0,"
+                . " player_soldier_slots_allocated = 0,"
+                . " player_atelier_1_allocated = 0,"
+                . " player_atelier_2_allocated = 0,"
+                . " player_atelier_3_allocated = 0,"
+                . " player_atelier_4_allocated = 0,"
+                . " player_workers_passed = 0";
+        self::DbQuery( $sql );
+        
+        //move start player left
+        $this->setFirstPlayerActive();
+        $this->activeNextPlayer();
+        $active_player_id = self::getActivePlayerId();
+        $this->setGameStateValue('first_player', $active_player_id);
+        
+        //advance season
+        $current_year = $this->getGameStateValue('current_year');
+        $current_season = $this->getGameStateValue('current_season');       
+                
+        if($current_season == 4 && $current_year == 3)
+        {
+            $this->gamestate->nextstate("endGame");
+            return;
+        }
+        
+        if ($current_season == 4 && $current_year < 3)
+        {
+            //throw new feException("yarr");
+            $current_year++;
+            $current_season = 1;
+            $this->rollSeasons();
+        }
+        else
+        {
+            //throw new feException("zogg");
+            $current_season++;
+        }
+        
+        //var_dump($current_season);
+        //die('ok');
+        
+        $this->setGameStateValue('current_year', $current_year);
+        $this->setGameStateValue('current_season', $current_season);       
+        
+        if ($current_season == 4)
+        {
+            $this->gamestate->nextstate("winter");        
+        }
+        else
+        {
+            $this->gamestate->nextstate("startNextSeason");        
+        }
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Zombie

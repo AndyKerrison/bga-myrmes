@@ -76,6 +76,61 @@
         
         */
         
+        $this->page->begin_block( "akmyrmes_akmyrmes", "hex" );
+        for( $x=0; $x<15; $x++ )
+        {
+            for ($y=0; $y<15; $y++)
+            {
+                if ($x + $y > 21 || $x + $y < 7)
+                    continue;
+                if ($y == 0)
+                {
+                    if ($x == 7 || $x == 8 || $x == 13 || $x == 14)
+                    continue;
+                }
+                if ($y == 1)
+                {
+                    if ($x == 6 || $x == 14)
+                    continue;
+                }
+                if ($y == 6)
+                {
+                    if ($x == 1 || $x == 14)
+                    continue;
+                }
+                if ($y == 7)
+                {
+                    if ($x == 0 || $x == 14)
+                    continue;
+                }
+                if ($y == 8)
+                {
+                    if ($x == 0 || $x > 12)
+                    continue;
+                }
+                if ($y == 13)
+                {
+                    if ($x == 0 || $x == 8)
+                    continue;
+                }
+                if ($y == 14)
+                {
+                    if ($x == 0 || $x == 1 || $x == 6 || $x == 7)
+                    continue;
+                }
+                $cartX = $x + floor(($y-1) / 2);
+                $offset = (1 - ($y % 2))*25;
+                $this->page->insert_block( "hex", array(
+                    'X' => $x,
+                    'Y' => $y,
+                    'XPOS' => $cartX*51.4 + (-165) + $offset,
+                    'YPOS' => $y*44.4 + 280,
+                ));
+            }
+        }
+        
+        
+        
         $this->page->begin_block( "akmyrmes_akmyrmes", "playerBoard" );
         foreach( $players as $player )
         {
