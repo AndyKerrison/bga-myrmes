@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS `tiles` (
    `tile_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
    `player_id` int(11) NOT NULL,
    `type_id` int(11) NOT NULL,
+   `rotation` int(11) NOT NULL,
    `color` varchar(16) NOT NULL,
    `location` varchar(16) NOT NULL,
    `x1` int(11) NOT NULL default 0,

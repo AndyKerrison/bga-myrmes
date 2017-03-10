@@ -28,7 +28,7 @@ function (dojo, declare) {
             // Here, you can init the global variables of your user interface
             // Example:
             // this.myGlobalValue = 0;
-
+            this.strActiveTileRequired = _("Current tile must be selected");
         },
         
         /*
@@ -85,7 +85,32 @@ function (dojo, declare) {
                     id: "tile_"+tunnels[i]['tile_id'],
                     color: tunnels[i]['color']
                 }), "hex_"+tunnels[i].x1+"_"+tunnels[i].y1);
-                this.placeOnObject("tile_"+tunnels[i]['tile_id'], "hex_"+tunnels[i].x1+"_"+tunnels[i].y1)
+                this.placeOnObject("tile_"+tunnels[i]['tile_id'], "hex_"+tunnels[i].x1+"_"+tunnels[i].y1);
+            }
+            
+            var pheromones = gamedatas['pheromones'];
+            for(var i=0; i<pheromones.length; i++)
+            {
+                console.log("placing pheromone on " + pheromones[i].x1 + "," + pheromones[i].y1);
+                dojo.place(
+                this.format_block('jstpl_pheromone', {
+                    id: "tile_"+pheromones[i]['tile_id'],
+                    color: pheromones[i]['color'],
+                    type: pheromones[i]['type_id']
+                }), "hex_"+pheromones[i].x1+"_"+pheromones[i].y1);
+                this.placeOnObjectPos("tile_"+pheromones[i]['tile_id'], "hex_"+pheromones[i].x1+"_"+pheromones[i].y1, 0, 55/2);
+                
+                var rotation = -90+60*pheromones[i]['rotation'];
+                
+                dojo.style("tile_"+pheromones[i]['tile_id'], 'transform', 'rotate('+rotation+'deg)');
+                
+                /*dojo.animateProperty({
+                node: "tile_"+pheromones[i]['tile_id'],
+                duration: 500,
+                properties: {
+                    transform: { start: 'rotate(' + 0 * 60 + 'deg)', end: 'rotate(' + 1 * 60 + 'deg)' }
+                }
+                }).play();*/
             }
             
             if (gamedatas['activeWorker'] != null)
@@ -108,6 +133,7 @@ function (dojo, declare) {
         //
         onEnteringState: function( stateName, args )
         {
+            this.stateName = stateName;
             console.log( 'Entering state: '+stateName );
             console.log(args);
             
@@ -161,7 +187,7 @@ function (dojo, declare) {
                     
                     break;
                 case 'moveWorker':
-                    
+                                       
                     var validHexMoves = args.args.validMoves;
                     for (var item in validHexMoves)
                     {
@@ -173,6 +199,16 @@ function (dojo, declare) {
                             //dojo.addClass("hex_"+x+"_"+y, 'active');
                         //}
                         dojo.addClass(validHexMoves[item], 'active');
+                    }
+                    
+                    break;
+                    
+                case 'placeTile':
+                                       
+                    var hexes = args.args.hexes;
+                    for (var item in hexes)
+                    {
+                        dojo.addClass(hexes[item], 'active');
                     }
                     
                     break;
@@ -246,6 +282,16 @@ function (dojo, declare) {
                     case 'storage' :
                         this.addActionButton( 'button_storage', _('Done'), 'onStorageChosen' ); 
                         break;
+                    case 'moveWorker':
+                        if (args["canPlaceTile"])
+                        {
+                           this.addActionButton('button_tile', _('Place Tile'), 'onPlaceTileButton');
+                        }
+                        break;
+                    case 'placeTile':
+                        this.addActionButton('button_confirm', _('Confirm'), 'onConfirmTileButton');
+                        this.addActionButton('button_cancel', _('Cancel'), 'onCancelButton');
+                        break;
 /*               
                  Example:
  
@@ -275,6 +321,8 @@ function (dojo, declare) {
         //todo - will need a colour and id at some point.
         placeActiveWorker: function(x, y)
         {
+            this.activeWorkerX = x;
+            this.activeWorkerY = y;
             dojo.place(
                 this.format_block('jstpl_worker', {
                     id: "worker_"+123,
@@ -284,6 +332,8 @@ function (dojo, declare) {
         
         moveActiveWorker: function(x, y)
         {
+            this.activeWorkerX = x;
+            this.activeWorkerY = y;
             //this.placeOnObject("worker_"+123, "hex_"+x+"_"+y);
             this.slideToObjectPos("worker_"+123, "hex_"+x+"_"+y, 0, 0, 500, 100).play();            
         },
@@ -375,6 +425,75 @@ function (dojo, declare) {
                 }, 
                 this, function( result ) { }, function( is_error) { } );        
         },
+        
+        onConfirmTileButton: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'confirmTile' ) )
+            {
+                return;
+            }
+            
+            //client side validation
+            // - we will validate that the current active hex is selected
+            
+            if (!dojo.hasClass("hex_"+this.activeWorkerX+"_"+this.activeWorkerY, "selected"))
+            {
+                this.showMessage(this.strActiveTileRequired, 'error');   
+                return;
+            }
+            
+            var selectedHexes = dojo.query('.selected');
+            console.log(selectedHexes);
+            
+            var hexes = "";
+            for(var i = 0;i<selectedHexes.length; i++)
+            {
+                if (i > 0)
+                {
+                    hexes += "x";
+                }
+                var parts = selectedHexes[i].id.split('_');
+                hexes += parts[1] + "_" + parts[2];
+            }
+            
+            this.ajaxcall( "/akmyrmes/akmyrmes/confirmTile.html", { 
+                    lock: true, 
+                    hexes: hexes
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
+        
+        onCancelButton: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'cancel' ) )
+            {
+                return;
+            }
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/cancelTile.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
+        
+        onPlaceTileButton: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'placeTile' ) )
+            {
+                return;
+            }
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/startPlaceTile.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
        
         onNurseAllocationFinished: function(evt)
         {
@@ -399,8 +518,33 @@ function (dojo, declare) {
                 } );        
         },
         
+        onHexSelected:function(evt)
+        {
+            dojo.stopEvent(evt);
+            
+            if (!dojo.hasClass(evt.currentTarget.id, "active"))
+            {
+                return;
+            }
+            
+            if (!dojo.hasClass(evt.currentTarget.id, "selected"))
+            {
+                dojo.addClass(evt.currentTarget.id, "selected");
+            }
+            else 
+            {
+                dojo.removeClass(evt.currentTarget.id, "selected");
+            }
+        },
+        
         onHexClicked: function(evt)
         {
+            if (this.stateName == "placeTile")
+            {
+                this.onHexSelected(evt);
+                return;
+            }
+            
             dojo.stopEvent(evt);
             
             if (!dojo.hasClass(evt.currentTarget.id, "active"))
@@ -536,9 +680,15 @@ function (dojo, declare) {
             
             dojo.subscribe('workerPlaced', this, "notif_workerPlaced");
             dojo.subscribe('workerMoved', this, "notif_workerMoved");
+            
+            dojo.subscribe('tilePlacementInvalid', this, "notif_tilePlacementInvalid");
         },  
         
         // TODO: from this point and below, you can write your game notifications handling methods
+        notif_tilePlacementInvalid: function(notif)
+        {
+            this.showMessage(notif.args.errMsg, 'error');
+        },
         
         notif_workerMoved: function(notif)
         {

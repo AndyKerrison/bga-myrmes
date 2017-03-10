@@ -125,9 +125,19 @@ $machinestates = array(
         "type" => "activeplayer",
         "args" => "argMoveWorker",
         "description" => clienttranslate('${actplayer} is moving a worker'),
-        "descriptionmyturn" => clienttranslate('You may move the worker'),
+        "descriptionmyturn" => clienttranslate('You may move the worker. ${moves} moves remaining'),
         "possibleactions" => array("moveWorker", "clearPheromone", "placeTile"),
-        "transitions" => array("workerMoved" => 12, "workerUsed" => 15)        
+        "transitions" => array("workerMoved" => 12, "workerUsed" => 15, "chooseTile" => 13)        
+    ),
+    
+    13 => array(
+        "name" => "placeTile",
+        "type" => "activeplayer",
+        "args" => "argPlaceTile",
+        "description" => clienttranslate('${actplayer} is placing a tile'),
+        "descriptionmyturn" => clienttranslate('Select the tiles to cover, and confirm'),
+        "possibleactions" => array("confirmTile", "cancel"),
+        "transitions" => array("tileChoiceRequired" => 14, "tilePlaced" => 15, "cancel" => 12)        
     ),
     
     15 => array(

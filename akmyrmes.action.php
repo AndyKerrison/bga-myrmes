@@ -90,6 +90,34 @@ class action_akmyrmes extends APP_GameAction
         self::ajaxResponse();
     }
     
+    public function startPlaceTile()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onStartPlaceTile();
+
+        self::ajaxResponse();
+    }
+    
+    public function cancelTile()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onCancelTile();
+
+        self::ajaxResponse();
+    }
+    
+    public function confirmTile()
+    {
+        self::setAjaxMode(); 
+                
+        $hexes = self::getArg( "hexes", AT_alphanum, true );
+        $this->game->onConfirmTile($hexes);
+
+        self::ajaxResponse();
+    }
+    
     public function harvestChosen()
     {
         self::setAjaxMode(); 

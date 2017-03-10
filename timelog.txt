@@ -1,2 +1,22 @@
 24/1/2017 - 1hr - basic setup, git, meta info, etc
-25/1/2017 - 1hr - start on states and setup. start on initial UI
+25/1/2017 - 1hr (2) - start on states and setup. start on initial UI
+26/1/2017 - 1hr (3) - multiactive start state
+27/1/2017 - 2hr (5) - multi active start start (larvae)
+29/1/2017 - 1hr (6) - multie active start (others)
+31/1/2017 - 2hr (8) - birthing, player worker order
+1/2/2017  - 1hr (9) - more game states
+2/2/2017  - 2hr (11) - more game states. Basic game cycle done.
+7/2/2017  - 2hr (13) - temp hex tiles, player icons
+9/2/2017  - 3hr (16) - tiles db store
+10/2/2017  - 1hr (17) - initial tunnel. Worker phase next.
+15/2/2017  - 1hr (18) - start worker stuff
+16/2/2017 - 2hr (20) - worker colony choices plus other tidying
+17/2/2017 - 1.5h (21.5) - worker placement on tunnel (backend side)
+19/2/2017 - 1.5h (23) - some hex stuff
+20/2/2017 - 2h (25) - pathfinding library
+21/2/2017 - 3h(28) - pathfinding, worker move. Next - pheromones, bugs, etc
+23/2/2017 - 2h (30) - axial hex grid rotations
+27/2/2017 - 1h (31) - place tile prelim
+3/3/2017 - 1hr (31) - confirm tile args
+5/3/2017 - 3hr (34) - tile placement validation
+8/3/2017 - 1hr (35) - tile placement to db

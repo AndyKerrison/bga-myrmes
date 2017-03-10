@@ -123,8 +123,8 @@
                 $this->page->insert_block( "hex", array(
                     'X' => $x,
                     'Y' => $y,
-                    'XPOS' => $cartX*51.4 + (-165) + $offset,
-                    'YPOS' => $y*44.4 + 280,
+                    'XPOS' => $cartX*46.3 + (-147) + $offset,
+                    'YPOS' => $y*40.4 + 255,
                 ));
             }
         }

@@ -19,6 +19,18 @@
     </div>
     <!-- END hex -->
 </div>
+    
+
+    <svg id="color-fill" xmlns="http://www.w3.org/2000/svg" version="1.1" width="300" height="300" xmlns:xlink="http://www.w3.org/1999/xlink">
+  
+  <polygon class="hex" points="0,10 20,0 40,10 40,35 20,45 0,35"></polygon>
+  
+</svg>
+    
+    
+    
+
+
 
 <!-- BEGIN playerBoard --> 
 <div>
@@ -71,6 +83,7 @@ var jstpl_player_iconsB = '<div class="iconholder">' +
         '</div>';
 
 var jstpl_tunnel = '<div id="${id}" class="tunnel ${color}"></div>';
+var jstpl_pheromone = '<div id="${id}" class="tile rot90 tileType${type} ${color}${type}"></div>';
 var jstpl_worker = '<div id="${id}" class="worker"></div>';
 
 </script>  

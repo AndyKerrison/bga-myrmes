@@ -44,7 +44,8 @@ class akMyrmes extends Table
             "first_player"=>15,
             "active_worker_x"=>16,
             "active_worker_y"=>17,
-            "active_worker_flag"=>18
+            "active_worker_flag"=>18,
+            "active_worker_moves"=>19
             //    "my_first_global_variable" => 10,
             //    "my_second_global_variable" => 11,
             //      ...
@@ -225,6 +226,9 @@ class akMyrmes extends Table
         
         $sql = "SELECT tile_id, color, x1, y1 from tiles where location='board' and type_id='1'";
         $result['tunnels'] = self::getObjectListFromDB( $sql );
+        
+        $sql = "SELECT tile_id, type_id, color, rotation, x1, y1 from tiles where location='board' and type_id > '1'";
+        $result['pheromones'] = self::getObjectListFromDB( $sql );
         
         if ($this->getGameStateValue("active_worker_flag")== 1)
         {
@@ -555,6 +559,201 @@ class akMyrmes extends Table
         (note: each method below must match an input method in akmyrmes.action.php)
     */
     
+    function saveTileToBoard($splitHexes, $tileType, $rotation, $isFlipped)
+    {
+        //first, get the ID of the tile we are adding to the board
+        $sql = "select tile_id from tiles where type_id='".$tileType."' and location='storage' and player_id='".self::getActivePlayerId()."' or player_id='0' limit 1";
+        $tile = self::getObjectFromDb( $sql );
+        $tileID = $tile["tile_id"];
+                
+        $x1 = $y1 = $x2 = $y2 = $x3 = $y3 = $x4 = $y4 = $x5 = $y5 = 0;
+        $xy1 = explode("_", $splitHexes[0]);
+        $x1 = $xy1[0];
+        $y1 = $xy1[1];
+                    
+        if (count($splitHexes) > 1)
+        {
+            $xy2 = explode("_", $splitHexes[1]);
+            $x2 = $xy2[0];
+            $y2 = $xy2[1];
+        }
+                    
+        if (count($splitHexes) > 2)
+        {
+            $xy3 = explode("_", $splitHexes[2]);
+            $x3 = $xy3[0];
+            $y3 = $xy3[1];
+        }
+                    
+        if (count($splitHexes) > 3)
+        {
+            $xy4 = explode("_", $splitHexes[3]);
+            $x4 = $xy4[0];
+            $y4 = $xy4[1];
+        }
+                    
+        if (count($splitHexes) > 4)
+        {
+            $xy5 = explode("_", $splitHexes[4]);
+            $x5 = $xy5[0];
+            $y5 = $xy5[1];
+        }
+        
+        //5, 0, 1 work as is. 2,3,4 will not since they will use a different origin
+        //in this case, subtract 3.
+        $newRot = $rotation;
+        if ($rotation = 2 || $rotation == 3 || $rotation == 4)
+        {
+            $newRot = $newRot - 3;
+        }
+                            
+        $sql = "update tiles set location='board', rotation='".$newRot."', player_id = '".self::getActivePlayerId()."', x1='".$x1."', y1='".$y1."' , x2='".$x2."', y2='".$y2."' , x3='".$x3."', y3='".$y3."' , x4='".$x4."', y4='".$y4."' , x5='".$x5."', y5='".$y5."' where tile_id = '".$tileID."'";
+        self::DbQuery( $sql );
+    }
+    
+    function onStartPlaceTile()
+    {
+        //user clicked the button to place a tile
+        $this->gamestate->nextstate("chooseTile");
+    }
+    
+    function onCancelTile()
+    {
+        //user clicked the button to place a tile
+        $this->gamestate->nextstate("cancel");
+    }
+    
+    //X_YxX_YxX_Y etc - can't use comma to separate as invalid arg type
+    function onConfirmTile($hexes)
+    {
+        //var_dump($hexes);
+        //die('ok');
+        
+        //remap hexes into vector array based on starting point.
+        //get all valid tile placements and check each type against it
+        //checking number of tiles first!
+        $x = $this->getGameStateValue("active_worker_x");
+        $y = $this->getGameStateValue("active_worker_y");
+        
+        $splitHexes = explode("x", $hexes);
+        $vectors = array();
+        
+        //strings can be more easily sorted, so we can compare vectors
+        foreach($splitHexes as $splitHex)
+        {
+            $parts = explode("_", $splitHex);
+            $vectors[] = ($parts[0] - $x)."_".($parts[1] - $y);
+            
+            //also check for conflicts while we're here            
+            $sql = "select type_id from tiles where location='board' and ".
+                                " (x1='".$parts[0]."' and y1='".$parts[1]."') OR ".
+                                " (x2='".$parts[0]."' and y2='".$parts[1]."') OR ".
+                                " (x3='".$parts[0]."' and y3='".$parts[1]."') OR ".
+                                " (x4='".$parts[0]."' and y4='".$parts[1]."') OR ".
+                                " (x5='".$parts[0]."' and y5='".$parts[1]."')";
+            
+            $clashes = self::getCollectionFromDb($sql);
+            if (count($clashes) > 0)
+            {
+                $errMsg = clienttranslate('Spaces are not empty');
+                self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                    array("errMsg"=>$errMsg)
+                );
+                return;
+            }
+        }
+        
+        sort($vectors);
+        
+               
+        //VALIDATION - check if the player has the required level for this size
+        $colonyLevel = $this->getPlayerVariable("player_colony_level", self::getActivePlayerId());
+
+                
+        //get the actual valid vectors, and somehow match them.
+        //this is an array of arrays. Each array is a list of hexes that might match
+        //those supplied. Find out!
+        $tilePlacements = $this->getTilePlacements(false);
+        $errMsg = "";
+                
+        //strings can be more easily sorted, so we can compare vectors
+        foreach($tilePlacements as $tilePlacement)
+        {
+            $targetVectors = array();
+            foreach($tilePlacement->Tiles as $hex)
+            {
+                $targetVectors[] = $hex["x"]."_".$hex["y"];
+            }
+            sort($targetVectors);
+            //var_dump("checking");
+            //var_dump($targetVectors);
+            
+            if (count($vectors) == count($targetVectors))
+            {
+                if (count(array_diff($vectors, $targetVectors)) == 0 && count(array_diff($targetVectors, $vectors)) == 0 )
+                {
+                    //var_dump("MATCH!!");
+                    //var_dump("type: ".$tilePlacement->Type);
+                    //var_dump("rotation: ".$tilePlacement->Rotation);
+                    //var_dump("isFlipped: ".$tilePlacement->IsFlipped);
+                    //var_dump("vectors: ");
+                    //var_dump($vectors);
+                    
+                    $requiredLevel = $this->playerTileTypes[$tilePlacement->Type]["levelRequired"];
+                    
+                    //validate colony level
+                    if ($requiredLevel > $colonyLevel)
+                    {
+                        $errMsg = clienttranslate('Colony level too low');
+                        continue;
+                    }
+                    
+                    //validate any tiles remaining, message if ran out of matches
+                    $sql = "select distinct type_id from tiles where type_id='".$tilePlacement->Type."' and location = 'storage' and player_id = '".self::getActivePlayerId()."'";
+                    $pheromoneTypes = self::getCollectionFromDb($sql);
+                    if (count($pheromoneTypes) == 0)
+                    {
+                        $errMsg = clienttranslate('No matching tiles remaining');
+                        continue;
+                    }
+                                        
+                    //so, we got a match. We need to know what type of tile this was
+                    //and figure out how we will draw it on the board                   
+                    
+                    //todo - save to db and process to next state
+                    //var_dump("type: ".$tilePlacement->Type);
+                    //var_dump("rotation: ".$tilePlacement->Rotation);
+                    //var_dump("isFlipped: ".$tilePlacement->IsFlipped);
+                    $this->saveTileToBoard($splitHexes, $tilePlacement->Type, $tilePlacement->Rotation, $tilePlacement->IsFlipped);                   
+                    $this->gamestate->nextstate("tilePlaced");
+                    return;
+                }
+                else
+                {
+                    //var_dump("no match");
+                }
+            }   
+            else
+            {
+                //wrong size, ignore
+            }
+        }
+        
+        if ($errMsg == "")
+        {
+            $errMsg = clienttranslate( 'Tile placement invalid');
+        }
+        
+        //user clicked the button to place a tile
+        //if their chosen tile configuration was valid, build the tile (or cofirm type)
+        //otherwise return an error message
+        //
+        //$this->gamestate->nextstate("confirmTile");
+        self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                array("errMsg"=>$errMsg)
+        );
+    }
+    
     function onHexClicked($x, $y)
     {
         //check valid
@@ -580,6 +779,7 @@ class akMyrmes extends Table
             $this->setGameStateValue("active_worker_flag", 1);
             $this->setGameStateValue("active_worker_x", $x);
             $this->setGameStateValue("active_worker_y", $y);
+            $this->setGameStateValue('active_worker_moves', 3);//todo handle extra move event
             
             //TODO - place a worker on the board (move it from player's board if possible)
             //TODO - make sure that reloading immediately after this state adds the worker
@@ -813,7 +1013,7 @@ class akMyrmes extends Table
     function pass(){
         
         $test = akUtils::getPlayerVariable('player_nurses', self::getCurrentPlayerId());
-        var_dump($test);
+        //var_dump($test);
         die('ok');        
         
         
@@ -857,7 +1057,31 @@ class akMyrmes extends Table
         game state.
     */
     
+    function argPlaceTile()
+    {
+        //player chose to place a tile. Picks hexes and confirms
+        // Show list of valid tiles as buttons?
+        //or enable click on tiles from near player board or something?
+        
+        //make everything valid within 3 hexes clickable
+        $x = $this->getGameStateValue("active_worker_x");
+        $y = $this->getGameStateValue("active_worker_y");
+                      
+        $searchNodeData = new MyrmesHexGrid($this->boardSpaces);
+    
+        $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
+        
+        $result = array();
+        $result["hexes"] = array();
+        foreach($moves as $move)
+        {
+            $result["hexes"][] = "hex_".$move->X."_".$move->Y;
+        }
+        return $result;
+    }
+    
     function argMoveWorker(){
+        //var_dump("argMoveWorker");
         //will depend on the current worker's location, blocked tiles, etc.
         //This one will be complicated.
         //If on an empty hex, can move to an adjacent hex
@@ -875,16 +1099,206 @@ class akMyrmes extends Table
         $searchNodeData = new MyrmesHexGrid($this->boardSpaces);
                
         $result = array();
+        $result["moves"]= $this->getGameStateValue('active_worker_moves');
         $result["validMoves"] = array();
         
-        $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
-        
-        foreach($moves as $move)
+        if ((int)$result["moves"] > 0)
         {
-            $result["validMoves"][] = "hex_".$move->X."_".$move->Y;
+            $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
+        
+            foreach($moves as $move)
+            {
+                $result["validMoves"][] = "hex_".$move->X."_".$move->Y;
+            }
         }
         
+        $tilePlacements = $this->getTilePlacements(true);
+        
+        $result["canPlaceTile"] = count($tilePlacements) > 0;
+        
         return $result;
+    
+    }
+    
+    function isValidTilePlacement($hexVectors, $xOrigin, $yOrigin)
+    {
+        //todo - also check for existing tiles, bugs, etc
+        
+        foreach ($hexVectors as $tile)
+        {
+            $tileX = $tile["x"] + $xOrigin;
+            $tileY = $tile["y"] + $yOrigin;
+            
+            //var_dump("CHECKING ".$tileX.",".$tileY);
+            
+            if (!isset($this->boardSpaces[$tileX][$tileY]))
+            {
+                return false;
+            }
+            
+            if ($this->boardSpaces[$tileX][$tileY] == "WATER")
+            {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    //sometimes we only want to know if there is a placement, not what they all are
+    //so in this case, return early tosave processing time
+    function getTilePlacements($returnFirstMatch)
+    {
+        $tilePlacements = array();
+        
+        //Where can the current player put tiles?
+        //this is probably the single most complex calculation of the game.
+        
+        //each piece type has 6 orientations (12 flipped) and 2-6 possible source spots
+        //if any of these is valid and we have the right piece, add to list
+        
+        //- tiles the player has in storage are valid
+        //- TODO get generic tiles that are shared also
+        //- TODO do not return tiles this player isn't a high enough level to use
+        
+        $x = $this->getGameStateValue("active_worker_x");
+        $y = $this->getGameStateValue("active_worker_y");
+        
+        //if we only want the first match,we are checking for tiles this player can place
+        //if we aren't, check all tiles.
+        if ($returnFirstMatch)
+        {
+            $sql = "select distinct type_id from tiles where location = 'storage' and player_id = '".self::getActivePlayerId()."'";
+        }
+        else
+        {
+            //all player tile types
+            $sql = "select distinct type_id from tiles where type_id < 9";
+        }
+        
+        $pheromoneTypes = self::getCollectionFromDb($sql);
+                        
+        //2 = X.X [0 0, +1 0]
+        //3 = X.X [0 0, +1 0, 0 +1]
+        //     X 
+        //4 = X.X.X
+        //
+        //     X
+        //5 = X.X
+        //     X
+        //6 = X.X.X
+        //     X
+        //7 = X.X.X
+        //     X.X
+        //8 = X.X.X
+        //     X.X
+        //      X
+        //var_dump($pheromoneTypes);
+                        
+        foreach($pheromoneTypes as $pheromoneType)
+        {
+            $type_id = $pheromoneType["type_id"];           
+                       
+            if ($type_id == "1")
+            {
+                continue; //don't want tunnels
+            }
+            
+            $hexes = array();
+            $flippedHexes = array();
+                        
+            if ($type_id == "2")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0));                
+            }
+            
+            if ($type_id == "3")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>0, "y"=>1));
+            }
+            
+            if ($type_id == "4")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0));
+            }
+            
+            if ($type_id == "5")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>-1));
+            }
+            
+            //types 6 and 7 require mirror flipped versions
+            if ($type_id == "6")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1));
+                $flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>-1));
+            }
+            
+            if ($type_id == "7")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1));
+                $flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>-1), array("x"=>2, "y"=>-1));
+            }
+            
+            if ($type_id == "8")
+            {
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1), array("x"=>0, "y"=>2));
+            }
+            
+            //check twice, once for regular orientation and a second time for mirror flip.
+            for ($m=0;$m<=1; $m++)
+            {
+                if($m ==1)
+                {
+                    $hexes = $flippedHexes;
+                }
+                
+                if (count($hexes) > 0)
+                {
+                    foreach($hexes as $hex)
+                    {
+                        //var_dump("using starting point:");
+                        //var_dump($hex);
+
+                        $newHexes = AxialHexGrid::SetOrigin($hexes, $hex);
+
+                        $rotatedHexes = $newHexes;
+
+                        //var_dump("hex array is now:");
+                        //var_dump($newHexes);                     
+
+                        //hex has 6 rotations
+                        for($i=0;$i<=5;$i++)
+                        {
+                            //var_dump("rotation ".$i);                       
+
+                            if ($i > 0) //don't rotate first time
+                            {
+                                $rotatedHexes = AxialHexGrid::RotateHexes($rotatedHexes, 1);
+                            }
+                            //var_dump("rotated axial hex is");
+                            //var_dump($rotatedHexes);                       
+
+                            //check the returned array hexes for placement validity
+                            $isValid = $this->isValidTilePlacement($rotatedHexes, $x, $y);
+
+                            if ($isValid)
+                            {
+                                $match = new TileData($rotatedHexes, $i, $pheromoneType["type_id"], $m==1);
+                                $tilePlacements[] = $match;
+                                
+                                if ($returnFirstMatch)
+                                {
+                                    return $tilePlacements;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $tilePlacements;        
     }
     
     function argPlaceWorker() {

@@ -41,19 +41,19 @@ $this->resourceNames = array(
 );
 
 $this->playerTileTypes = array(
-    array("type" => 1, "points" => 0, "count" =>4), //tunnels
-    array("type" => 2, "points" => 0, "count" =>6), //2-space
-    array("type" => 3, "points" => 2, "count" =>2), //3-space triangle
-    array("type" => 4, "points" => 2, "count" =>2), //3-space line
-    array("type" => 5, "points" => 4, "count" =>2), //4-space even
-    array("type" => 6, "points" => 4, "count" =>2), //4-space irreg
-    array("type" => 7, "points" => 6, "count" =>2), //5-space
-    array("type" => 8, "points" => 8, "count" =>1), //6-space
+    "1"=>array("type" => 1, "levelRequired"=>0, "points" => 0, "count" =>4), //tunnels
+    "2"=>array("type" => 2, "levelRequired"=>0, "points" => 0, "count" =>6), //2-space
+    "3"=>array("type" => 3, "levelRequired"=>1, "points" => 2, "count" =>2), //3-space triangle
+    "4"=>array("type" => 4, "levelRequired"=>1, "points" => 2, "count" =>2), //3-space line
+    "5"=>array("type" => 5, "levelRequired"=>2, "points" => 4, "count" =>2), //4-space even
+    "6"=>array("type" => 6, "levelRequired"=>2, "points" => 4, "count" =>2), //4-space irreg
+    "7"=>array("type" => 7, "levelRequired"=>3, "points" => 6, "count" =>2), //5-space
+    "8"=>array("type" => 8, "levelRequired"=>4, "points" => 8, "count" =>1), //6-space
 );
 
 $this->sharedTileTypes = array(
-    array("type" => 9, "points" => 2, "count" =>6), //aphid/scavenging
-    array("type" => 10, "points" => 4, "count" =>8) //subcolony
+    "9"=>array("type" => 9, "points" => 2, "count" =>6), //aphid/scavenging
+    "10"=>array("type" => 10, "points" => 4, "count" =>8) //subcolony
 );
 
 $this->hexInfo = array(array());

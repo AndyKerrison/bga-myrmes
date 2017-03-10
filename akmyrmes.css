@@ -45,6 +45,47 @@
 @import url(../../../css/csslayer.css); /* Note: you must not use any @import directive other than this one */
 
 /********* You can start writing your CSS below this line: **********/
+.hex {
+  cursor: pointer;
+  fill-opacity: 0.4;
+  stroke: #000;
+  stroke-width: 1;
+}
+
+#color-fill .hex {
+  fill: #ffff00;
+}
+
+#color-fill {
+  position: absolute;
+  top: 252px;
+  left: 243px;
+}
+
+.hex:hover {
+  /*fill-opacity: 1;
+  stroke: #ff0000;
+  stroke-width: 5;
+  transform: scale(0.9);
+  -webkit-transform: scale(0.9);
+  transform-origin: 50% 50%;
+  -webkit-transform-origin: 50% 50%;*/
+  fill: #00ff00 !important;
+  fill-opacity: 1;
+}
+
+.hex {
+  transition: transform, fill-opacity, stroke-width;
+  -webkit-transition: transform, fill-opacity, stroke-width;
+  transition-duration: 1s;
+  -webkit-transition-duration: 1s;
+}
+
+
+
+
+
+
 
 .worker {
     height: 20px;
@@ -97,6 +138,31 @@
     border: 2px solid black !important;    
 }
 
+.tile {
+    position: absolute;
+}
+
+.tileType2 {
+    width:55px;
+    height: 93px;
+}
+
+.yellow2 {
+    background-image: url('img/t0_0.png');
+}
+
+.blue2 {
+    background-image: url('img/t0_1.png');
+}
+
+.red2 {
+    background-image: url('img/t0_2.png');
+}
+
+.black2 {
+    background-image: url('img/t0_3.png');
+}
+
 .temp {
     width: 100px;
     height: 50px;
@@ -104,9 +170,24 @@
     float: left;
 }
 
+.rot90 {
+    -webkit-transform-origin: 27px 27px;
+    -moz-transform-origin: 27px 27px;
+    -ms-transform-origin: 27px 27px;
+    -o-transform-origin: 27px 27px;
+    transform-origin: 27px 27px;
+
+    /*transform: rotate(90deg);*/
+}
+
 .active {
     cursor: pointer;
     border: 1px dashed green;
+}
+
+.selected {
+    background-color: rgba(0, 255, 0, 0.5);
+    
 }
 
 .hex.active {
@@ -119,9 +200,9 @@
 
 
 #board {
-    height: 1097px;
-    width: 720px;
-    background-image: url('img/myrboard1.jpg');
+    height: 875px;
+    width: 650px;
+    background-image: url('img/plateau.jpg');
     float: left;
 }
 
