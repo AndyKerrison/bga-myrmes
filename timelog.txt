@@ -4,6 +4,8 @@
 27/1/2017 - 2hr (5) - multi active start start (larvae)
 29/1/2017 - 1hr (6) - multie active start (others)
 31/1/2017 - 2hr (8) - birthing, player worker order
+(8)
+
 1/2/2017  - 1hr (9) - more game states
 2/2/2017  - 2hr (11) - more game states. Basic game cycle done.
 7/2/2017  - 2hr (13) - temp hex tiles, player icons
@@ -17,6 +19,76 @@
 21/2/2017 - 3h(28) - pathfinding, worker move. Next - pheromones, bugs, etc
 23/2/2017 - 2h (30) - axial hex grid rotations
 27/2/2017 - 1h (31) - place tile prelim
+(23)
+
 3/3/2017 - 1hr (31) - confirm tile args
 5/3/2017 - 3hr (34) - tile placement validation
 8/3/2017 - 1hr (35) - tile placement to db
+10/3/2017 - 3hr (38) - fun with hexes
+11/3/2017 - 1hr (39) - images
+12/3/2017 - 4hr (43) - more worker bits
+13/3/2017 - 1hr (44) - worker stuff
+21/3/2017 - 1hr (45) - tile placements
+22/3/2017 - 1.5hr (46.5) - tile placements
+29/3/2017 - 0.5hr (47) - more worker/tile bits
+(16)
+
+2/4/2017 - 1.5hr (48.5) - 2/3p unusable areas, bugs WIP
+11/4/2017 - 2.5hr (51) - soldiers & bugs
+12/4/2017 - 2hr (53) more bugs, placement of resource tokens
+15/4/2017 - 2hr (55) harvest WIP
+17/4/2017 - 1hr (56) harvest
+19/4/2017 - 2hr (58) atelier nurse/level
+(11)
+
+3/5/2017 - 2hr (60) bottom left bug, multi active state bug, unset prev event
+4/5/2017 - 1hr (61) discarding resources WIP
+7/5/2017 - 1hr (62) discard resources finished
+10/5/2017 - 2hr (64) clear pheromones, harvest bug, action validation js/php, prog start
+11/5/2017 - 2hr (66) game progression finished, added image buttons for res, start of multiple matches
+12/5/2017 - 2hr (66) more on multiple matches. images+placement (mostly).
+16/5/2017 - 0.5 (66.5) multiple matches done, start of non phero tile handling (clear, res place.Harvest Todo)
+22/5/2017 - 1hr (67.5) place tunnel WIP
+(9.5)
+
+6/6/2017 - 1.5hr (69) atelier place tunnel
+8/6/2017 - 1.5hr (70.5) harvest types, events WIP
+13/6/2017 - 0.5hr (71) season/event names
+14/6/2017 - 1h (72) events done, plus larvae conversion & zombie
+(4.5)
+
+4/7/2017 - 2hr (74) tile stocks
+11/7/2017 -1.5hr (75.5) worker stock
+12/7/2017 -1hr (76) special stock
+16/7/2017 - 1hr (77) stocks
+20/7/2017 -1hr (78) limits, check req for building special tiles - food/stone, tunnel dirt anim
+
+(6.5)
+
+22/6/2018 - 1.5hr (79.5) event 
+
+(1.5)
+
+16/6/2019 - 3.5 hr (83) refactor to restart!
+18/6/2019 - 1hr (84) colony board work
+20/6/2019 - 1hr (85) colony board
+23/6/2019- 1hr (86) colony board
+
+
+
+//todo - refactor includes, source control
+//todo - player boards
+//todo - playthrough as inactive player
+
+//todo - thanks victoria for actionbuttonimage code, suggest adding some sort of index to shared code. Put in wiki?
+//todo - on a similar vein, get the pathfinding/hex code standardised and do the same with that
+
+//MYRMES:
+code review...
+season/events display(need graphic?)
+
+--bigger stuff
+ALL objectives + evt obj vp bonus (need graphics)
+atelier anims (need graphic)
+colony display (need graphic)
+zombie player test when live

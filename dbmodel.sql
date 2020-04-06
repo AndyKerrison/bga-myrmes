@@ -32,6 +32,7 @@
 
 -- Example 2: add a custom field to the standard "player" table
 -- ALTER TABLE `player` ADD `player_my_custom_field` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_color_name` varchar(16) NOT NULL default '';
 ALTER TABLE `player` ADD `player_nurses` INT UNSIGNED NOT NULL DEFAULT '0';
 ALTER TABLE `player` ADD `player_soldiers` INT UNSIGNED NOT NULL DEFAULT '0';
 ALTER TABLE `player` ADD `player_workers` INT UNSIGNED NOT NULL DEFAULT '0';
@@ -48,6 +49,7 @@ ALTER TABLE `player` ADD `player_atelier_1_allocated` INT UNSIGNED NOT NULL DEFA
 ALTER TABLE `player` ADD `player_atelier_2_allocated` INT UNSIGNED NOT NULL DEFAULT '0';
 ALTER TABLE `player` ADD `player_atelier_3_allocated` INT UNSIGNED NOT NULL DEFAULT '0';
 ALTER TABLE `player` ADD `player_atelier_4_allocated` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `player` ADD `player_atelier_used` INT UNSIGNED NOT NULL DEFAULT '0';
 
 ALTER TABLE `player` ADD `player_event_selected` INT UNSIGNED NOT NULL DEFAULT '0';
 ALTER TABLE `player` ADD `player_workers_passed` INT UNSIGNED NOT NULL DEFAULT '0';
@@ -65,9 +67,11 @@ CREATE TABLE IF NOT EXISTS `tiles` (
    `tile_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
    `player_id` int(11) NOT NULL,
    `type_id` int(11) NOT NULL,
+   `subtype_id` varchar(2) NOT NULL,
    `rotation` int(11) NOT NULL,
    `color` varchar(16) NOT NULL,
    `location` varchar(16) NOT NULL,
+   `flipped` int(11) NOT NULL default 0,
    `x1` int(11) NOT NULL default 0,
    `y1` int(11) NOT NULL default 0,
    `x2` int(11) NOT NULL default 0,
@@ -80,6 +84,13 @@ CREATE TABLE IF NOT EXISTS `tiles` (
    `y5` int(11) NOT NULL default 0,
    `x6` int(11) NOT NULL default 0,
    `y6` int(11) NOT NULL default 0,  
+   `res1` varchar(16) NOT NULL default '',
+   `res2` varchar(16) NOT NULL default '',
+   `res3` varchar(16) NOT NULL default '',
+   `res4` varchar(16) NOT NULL default '',
+   `res5` varchar(16) NOT NULL default '',
+   `res6` varchar(16) NOT NULL default '',
+   `selected_harvest_hexes` int(11) NOT NULL default 0,  
    PRIMARY KEY (`tile_id`)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
 

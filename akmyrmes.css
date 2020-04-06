@@ -45,11 +45,79 @@
 @import url(../../../css/csslayer.css); /* Note: you must not use any @import directive other than this one */
 
 /********* You can start writing your CSS below this line: **********/
+
+.stockItem {
+    position: relative !important;
+    float: left;
+}
+
 .hex {
-  cursor: pointer;
-  fill-opacity: 0.4;
+  /*cursor: pointer;*/
+  fill-opacity: 0.1;
   stroke: #000;
-  stroke-width: 1;
+  stroke-width: 0;
+  stroke-dasharray: 5;
+}
+
+.token {
+    position: absolute;
+    height: 30px;
+    width: 30px;
+    z-index: 20;
+}
+
+.supply {
+    float: left;
+    width: 500px;
+    height: 100px;
+    border: 1px solid red;
+}
+
+.supply .tile {
+    background-size: contain;
+    padding-left: 8px;
+    padding-top: 12px;
+    box-sizing: border-box;
+    font-size: 20px;
+    font-weight: bold;
+    color: #eeeeee;
+}
+
+.supply .yellowTunnel, .supply .yellow2, .supply .yellow3, .supply .yellow4, .supply .yellow5, .supply .yellow6, .supply .yellow7, .supply .yellow8 {
+    color: #000000;
+}
+
+.padLeft {
+    padding-left: 14px !important;
+}
+
+.playerBoard {
+    float: left;
+    width: 100px;
+    height: 100px;
+}
+
+.btnRes {
+    height: 30px;
+    width: 30px;
+}
+
+.STONE {
+    background-image: url('img/30_30_wooden_cubes.png');
+}
+.DIRT {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -210px;
+}
+.FOOD {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -120px;
+}
+
+.unusable {
+    fill-opacity: 0.4;
+    /*fill: #000000;
+    stroke: #000;*/
 }
 
 #color-fill .hex {
@@ -70,59 +138,23 @@
   -webkit-transform: scale(0.9);
   transform-origin: 50% 50%;
   -webkit-transform-origin: 50% 50%;*/
-  fill: #00ff00 !important;
-  fill-opacity: 1;
+  /*fill: #00ff00 !important;
+  fill-opacity: 0.2;*/
 }
 
 .hex {
   transition: transform, fill-opacity, stroke-width;
   -webkit-transition: transform, fill-opacity, stroke-width;
-  transition-duration: 1s;
-  -webkit-transition-duration: 1s;
+  transition-duration: 0.5s;
+  -webkit-transition-duration: 0.5s;
 }
 
-
-
-
-
-
-
-.worker {
-    height: 20px;
-    width: 20px;
-    background-color: black;
-    position: absolute;
-}
-
-.tunnel {
-    height: 25px;
-    width: 25px;
-    border: 3px solid white;
-    position: absolute;
-}
-
-.tunnel.red {
-    border-color: red;
-}
-
-.tunnel.blue {
-    border-color: blue;
-}
-
-.tunnel.green {
-    border-color: green;
-}
-
-.tunnel.yellow {
-    border-color: yellow;
-}
-
-.hex {
+/*.hex {
     width: 30px;
     height: 35px;
     border: 1px solid yellow;
     color: white;
-}
+}*/
 
 .iconholder {
     height: 25px;
@@ -140,27 +172,6 @@
 
 .tile {
     position: absolute;
-}
-
-.tileType2 {
-    width:55px;
-    height: 93px;
-}
-
-.yellow2 {
-    background-image: url('img/t0_0.png');
-}
-
-.blue2 {
-    background-image: url('img/t0_1.png');
-}
-
-.red2 {
-    background-image: url('img/t0_2.png');
-}
-
-.black2 {
-    background-image: url('img/t0_3.png');
 }
 
 .temp {
@@ -183,11 +194,24 @@
 .active {
     cursor: pointer;
     border: 1px dashed green;
+    stroke: #00dd00;
+    stroke-width: 3;
+    z-index:150;
+}
+
+.atelierHex {
+    /*cursor: pointer;*/
+    border: 1px dashed green;
+    stroke: #00dd00;
+    /*stroke-width: 4;*/
+    z-index:150;
+    stroke-dasharray: 8;
 }
 
 .selected {
-    background-color: rgba(0, 255, 0, 0.5);
-    
+    fill: #ffffff;
+    fill-opacity: 0.4;
+    stroke-dasharray: 0;
 }
 
 .hex.active {
@@ -198,6 +222,17 @@
     background-color: green;
 }
 
+.hexHolder {
+    height: 50px;
+    width: 44px;
+}
+
+#eventBoard {
+	background-image: url('img/eventBoard.png');
+	width: 265px;
+	height: 60px;
+	float: left;
+}
 
 #board {
     height: 875px;
@@ -205,6 +240,47 @@
     background-image: url('img/plateau.jpg');
     float: left;
 }
+
+.eventDice
+{
+	height: 62px;
+	width: 62px;
+	background-image: url('img/64_64_dice.jpg');
+	position: absolute;
+}
+
+#yearMarker
+{
+	height: 18px;
+	width: 18px;
+	background-image: url('img/30_30_wooden_cubes.png');	
+	position: absolute;
+	background-size: 200px;
+	background-position-x: -92px;
+}
+
+.season_spring
+{
+	background-position-y: -124px;	
+}
+
+.season_summer
+{
+	background-position-y: -62px;	
+}
+
+.event1
+{ }
+.event2
+{ background-position-x: -62px;	}
+.event3
+{ background-position-x: -126px; }
+.event4
+{ background-position-x: -189px; }
+.event5
+{ background-position-x: -252px; }
+.event6
+{ background-position-x: -315px; }
 
 /*
     Example of CSS sprites (a black token and a white token, 20x20px each, embedded in the same "tokens.png" 40x20px image):
@@ -224,6 +300,352 @@
     }
 */
 
+.nurse {
+    height: 42px;
+    width: 42px;   
+    position: absolute;
+    z-index: 100;
+}
+
+.special {
+    height: 30px;
+    width: 30px;   
+    position: absolute;
+    z-index: 100;
+}
+
+.blueSpecial {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -30px;
+}
+
+.yellowSpecial {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -90px;
+}
+
+.redSpecial {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -60px;
+}
+
+.blackSpecial {
+    background-image: url('img/30_30_wooden_cubes.png');
+    background-position-x: -180px;
+}
+
+.worker {
+    height: 42px;
+    width: 42px;   
+    position: absolute;
+    z-index: 100;
+}
+
+.yellowWorker {
+    background-image: url('img/f0.png');
+}
+
+.blueWorker {
+    background-image: url('img/f1.png');
+}
+
+.redWorker {
+    background-image: url('img/f2.png');
+}
+
+.blackWorker {
+    background-image: url('img/f3.png');
+}
 
 
+/*FINAL CSS HERE*/
+
+/*bugs*/
+.tileType11{
+    height: 42px;
+    width: 42px;
+    background-image: url('img/p2.png');
+}
+
+.tileType12 {
+    height: 42px;
+    width: 42px;
+    background-image: url('img/p1.png');
+}
+
+.tileType13 {    
+    height: 42px;
+    width: 42px;
+    background-image: url('img/p3.png');
+}
+/*end bugs*/
+
+/*tunnels*/
+.tunnel {
+    height: 42px;
+    width: 42px;
+    position: absolute;
+}
+
+.supply .tunnel {
+    height: 21px;
+    width: 21px;
+}
+
+.yellowTunnel {
+    background-image: url('img/g0.png');
+}
+
+.blueTunnel {
+    background-image: url('img/g1.png');
+}
+
+.redTunnel {
+    background-image: url('img/g2.png');
+}
+
+.blackTunnel {
+    background-image: url('img/g3.png');
+}
+
+/*end tunnels*/
+
+/*pheromone tiles*/
+.tileType2 {
+    width:55px;
+    height: 93px;
+}
+
+.supply .tileType2 {
+    width:28px;
+    height: 47px;
+}
+
+.tileType3, .tileType9a, .tileType9b {
+    width: 94px;
+    height: 93px;
+}
+
+.supply .tileType3, .supply .tileType9a, .supply .tileType9b {
+    width: 47px;
+    height: 47px;
+}
+
+.tileType4 {
+    width: 55px;
+    height: 141px;
+}
+
+.supply .tileType4 {
+    width: 28px;
+    height: 71px;
+}
+
+.tileType5, .tileType10 {
+    width: 94px;
+    height: 116px;
+}
+
+.supply .tileType5, .supply .tileType10 {
+    width: 47px;
+    height: 58px;
+}
+
+.tileType6 {
+    width: 95px;
+    height: 140px;
+}
+
+.supply .tileType6 {
+    width: 47px;
+    height: 70px;
+}
+
+.tileType7 {
+    width: 95px;
+    height: 140px;
+}
+
+.supply .tileType7 {
+    width: 47px;
+    height: 70px;
+}
+
+.tileType8 {
+    width: 136px;
+    height: 140px;
+}
+
+.supply .tileType8 {
+    width: 68px;
+    height: 70px;
+}
+
+.yellow2 {
+    background-image: url('img/t0_0.png');
+}
+
+.blue2 {
+    background-image: url('img/t0_1.png');
+}
+
+.red2 {
+    background-image: url('img/t0_2.png');
+}
+
+.black2 {
+    background-image: url('img/t0_3.png');
+}
+
+.yellow3 {
+    background-image: url('img/t2_0.png');
+}
+
+.blue3 {
+    background-image: url('img/t2_1.png');
+}
+
+.red3 {
+    background-image: url('img/t2_2.png');
+}
+
+.black3 {
+    background-image: url('img/t2_3.png');
+}
+
+.yellow4 {
+    background-image: url('img/t1_0.png');
+}
+
+.blue4 {
+    background-image: url('img/t1_1.png');
+}
+
+.red4 {
+    background-image: url('img/t1_2.png');
+}
+
+.black4 {
+    background-image: url('img/t1_3.png');
+}
+
+.yellow5 {
+    background-image: url('img/t3_0.png');
+}
+
+.blue5 {
+    background-image: url('img/t3_1.png');
+}
+
+.red5 {
+    background-image: url('img/t3_2.png');
+}
+
+.black5 {
+    background-image: url('img/t3_3.png');
+}
+
+.yellow6 {
+    background-image: url('img/t4_0.png');
+}
+
+.blue6 {
+    background-image: url('img/t4_1.png');
+}
+
+.red6 {
+    background-image: url('img/t4_2.png');
+}
+
+.black6 {
+    background-image: url('img/t4_3.png');
+}
+
+.yellow7 {
+    background-image: url('img/t5_0.png');
+}
+
+.blue7 {
+    background-image: url('img/t5_1.png');
+}
+
+.red7 {
+    background-image: url('img/t5_2.png');
+}
+
+.black7 {
+    background-image: url('img/t5_3.png');
+}
+
+.yellow8 {
+    background-image: url('img/t6_0.png');
+}
+
+.blue8 {
+    background-image: url('img/t6_1.png');
+}
+
+.red8 {
+    background-image: url('img/t6_2.png');
+}
+
+.black8 {
+    background-image: url('img/t6_3.png');
+}
+
+.neutral9 {
+    background-image: url('img/t7.png');
+}
+
+.yellow9a {
+    background-image: url('img/t7_0.png');
+}
+
+.blue9a {
+    background-image: url('img/t7_1.png');
+}
+
+.red9a {
+    background-image: url('img/t7_2.png');
+}
+
+.black9a {
+    background-image: url('img/t7_3.png');
+}
+
+.yellow9b {
+    background-image: url('img/t8_0.png');
+}
+
+.blue9b {
+    background-image: url('img/t8_1.png');
+}
+
+.red9b {
+    background-image: url('img/t8_2.png');
+}
+
+.black9b {
+    background-image: url('img/t8_3.png');
+}
+
+.neutral10 {
+    background-image: url('img/t9.png');
+}
+
+.yellow10 {
+    background-image: url('img/t9_0.png');
+}
+
+.blue10 {
+    background-image: url('img/t9_1.png');
+}
+
+.red10 {
+    background-image: url('img/t9_2.png');
+}
+
+.black10 {
+    background-image: url('img/t9_3.png');
+}
 

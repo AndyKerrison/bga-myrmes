@@ -31,7 +31,8 @@
     function getGameName() {
         return "akmyrmes";
     }    
-  	function build_page( $viewArgs )
+  	
+    function build_page( $viewArgs )
   	{		
   	    // Get players & players number
         $players = $this->game->loadPlayersBasicInfos();
@@ -77,6 +78,7 @@
         */
         
         $this->page->begin_block( "akmyrmes_akmyrmes", "hex" );
+        $this->page->begin_block( "akmyrmes_akmyrmes", "hexUnusable" );
         for( $x=0; $x<15; $x++ )
         {
             for ($y=0; $y<15; $y++)
@@ -119,28 +121,94 @@
                     continue;
                 }
                 $cartX = $x + floor(($y-1) / 2);
-                $offset = (1 - ($y % 2))*25;
-                $this->page->insert_block( "hex", array(
-                    'X' => $x,
-                    'Y' => $y,
-                    'XPOS' => $cartX*46.3 + (-147) + $offset,
-                    'YPOS' => $y*40.4 + 255,
-                ));
+                $offset = (1 - ($y % 2))*23;
+                
+                //mask
+                $unusable = false;
+                
+                if ($players_nbr == 2)
+                {
+                    if ($y <=6)
+                    {
+                        $unusable = true;
+                    }                    
+                }
+                
+                if ($players_nbr == 3)
+                {
+                    if ($y <=1)
+                    {
+                        $unusable = true;
+                    }                    
+                    if ($x <=1)
+                    {
+                        $unusable = true;
+                    }     
+                    if ($x + $y >=20)
+                    {
+                        $unusable = true;
+                    }                    
+                }
+                
+                if ($unusable)
+                {
+                    $this->page->insert_block( "hexUnusable", array(
+                        'X' => $x,
+                        'Y' => $y,
+                        'XPOS' => $cartX*46.4 + (-154) + $offset,
+                        'YPOS' => $y*40.4 + 249                        
+                    ));                
+                }
+                else
+                {
+                    $this->page->insert_block( "hex", array(
+                        'X' => $x,
+                        'Y' => $y,
+                        'XPOS' => $cartX*46.4 + (-154) + $offset,
+                        'YPOS' => $y*40.4 + 249                        
+                    ));                
+                }
             }
         }
         
+        global $g_user;
+        $current_player_id = $g_user->get_id();
+        $started = false;
         
-        
-        $this->page->begin_block( "akmyrmes_akmyrmes", "playerBoard" );
+        $this->page->begin_block( "akmyrmes_akmyrmes", "playerBoard" );        
         foreach( $players as $player )
         {
-            $this->page->insert_block( "playerBoard", array( 
-                "PLAYER_NAME" => $player['player_name']
-            ) );
+            if ($player['player_id'] == $current_player_id || $started)
+            {
+                $color = self::getUniqueValueFromDB("select player_color_name from player where player_id='".$player["player_id"]."'" );
+                
+                $this->page->insert_block( "playerBoard", array( 
+                    "PLAYER_NAME" => $player['player_name'],
+                    "PLAYER_ID" => $player['player_id'],
+                    "PLAYER_COLOR" => $color
+                ) );           
+                $started = true;
+            }
         }
-
+        
+        foreach( $players as $player )
+        {
+            if ($player['player_id'] != $current_player_id && $started)
+            {
+                $color = self::getUniqueValueFromDB("select player_color_name from player where player_id='".$player["player_id"]."'" );
+                
+                $this->page->insert_block( "playerBoard", array( 
+                    "PLAYER_NAME" => $player['player_name'],
+                    "PLAYER_ID" => $player['player_id'],
+                    "PLAYER_COLOR" => $color
+                ) );           
+            }
+            else {
+                $started = false;
+            }
+        }
         /*********** Do not change anything below this line  ************/
-  	}
-  }
+    }
+}
   
 

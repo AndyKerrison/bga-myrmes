@@ -19,18 +19,17 @@
  *
  */
 
+$this->defaultMovePoints = 3; //set back to 3 for release
+$this->initialColonyLevel = 0; //set back to 0 for release
+$this->initialWorkerCount = 2; //set back to 2 for release
+$this->initialNurseCount = 3; //set back to 3 for release
+$this->initialLarvaeCount = 1; //set back to 1 for release
+$this->initialFoodCount = 0; //set back to 0 for release
+$this->initialDirtCount = 0; //set back to 0 for release
 
-/*
-
-Example:
-
-$this->card_types = array(
-    1 => array( "card_name" => ...,
-                ...
-              )
-);
-
-*/
+$this->maxNurseCount = 8;
+$this->maxWorkerCount = 8; //set to 8 before release
+$this->maxSpecialTileCount = 4;
 
 $this->resourceNames = array(
     "larvae" => clienttranslate('Larvae'),
@@ -38,27 +37,104 @@ $this->resourceNames = array(
     "dirt" => clienttranslate('Dirt'),
     "stone" => clienttranslate('Stone'),
     "vp" => clienttranslate('Victory Points'),
+    "ladybug" => clienttranslate('Ladybug'),
+    "termite" => clienttranslate('Termite'),
+    "spider" => clienttranslate('Spider'),
 );
 
+$this->seasonNames = array(
+    1 => clienttranslate('Spring'),
+    2 => clienttranslate('Summer'),
+    3 => clienttranslate('Fall'),
+    4 => clienttranslate('Winter')
+);
+
+$this->events = array(
+    0 => array("name" => clienttranslate('Level +1')),
+    1 => array("name" => clienttranslate('VP +1')),
+    2 => array("name" => clienttranslate('Larvae +2')),
+    3 => array("name" => clienttranslate('Harvest +3')),
+    4 => array("name" => clienttranslate('Move +3')),
+    5 => array("name" => clienttranslate('Soldier +1')),
+    6 => array("name" => clienttranslate('Hex +1')),
+    7 => array("name" => clienttranslate('Worker +1')),
+);
+
+$this->eventLevel = 0;
+$this->eventVP = 1;
+$this->eventLarvae = 2; //working
+$this->eventHarvest = 3;
+$this->eventMove = 4;
+$this->eventSoldier = 5; //working
+$this->eventHex = 6;
+$this->eventWorker = 7; //working
+
+//2 = X.X [0 0, +1 0]
+//
+//3 = X.X [0 0, +1 0, 0 +1]
+//     X 
+//     
+//4 = X.X.X
+//
+//     X
+//5 = X.X
+//     X
+//     
+//6 = X.X.X
+//     X
+//     
+//     X.X
+//7 = X.X.X
+//     
+//8 = X.X.X
+//     X.X
+//      X
 $this->playerTileTypes = array(
-    "1"=>array("type" => 1, "levelRequired"=>0, "points" => 0, "count" =>4), //tunnels
-    "2"=>array("type" => 2, "levelRequired"=>0, "points" => 0, "count" =>6), //2-space
-    "3"=>array("type" => 3, "levelRequired"=>1, "points" => 2, "count" =>2), //3-space triangle
-    "4"=>array("type" => 4, "levelRequired"=>1, "points" => 2, "count" =>2), //3-space line
-    "5"=>array("type" => 5, "levelRequired"=>2, "points" => 4, "count" =>2), //4-space even
-    "6"=>array("type" => 6, "levelRequired"=>2, "points" => 4, "count" =>2), //4-space irreg
-    "7"=>array("type" => 7, "levelRequired"=>3, "points" => 6, "count" =>2), //5-space
-    "8"=>array("type" => 8, "levelRequired"=>4, "points" => 8, "count" =>1), //6-space
+    "1"=>array("type" => 1, "levelRequired"=>0, "points" => 0, "count" =>4, "size"=>1), //tunnels
+    "2"=>array("type" => 2, "levelRequired"=>0, "points" => 0, "count" =>6, "size"=>2), //2-space
+    "3"=>array("type" => 3, "levelRequired"=>1, "points" => 2, "count" =>2, "size"=>3), //3-space triangle
+    "4"=>array("type" => 4, "levelRequired"=>1, "points" => 2, "count" =>2, "size"=>3), //3-space line
+    "5"=>array("type" => 5, "levelRequired"=>2, "points" => 4, "count" =>2, "size"=>4), //4-space even
+    "6"=>array("type" => 6, "levelRequired"=>2, "points" => 4, "count" =>2, "size"=>4), //4-space irreg
+    "7"=>array("type" => 7, "levelRequired"=>3, "points" => 6, "count" =>2, "size"=>5), //5-space
+    "8"=>array("type" => 8, "levelRequired"=>4, "points" => 8, "count" =>1, "size"=>6), //6-space
 );
 
 $this->sharedTileTypes = array(
-    "9"=>array("type" => 9, "points" => 2, "count" =>6), //aphid/scavenging
-    "10"=>array("type" => 10, "points" => 4, "count" =>8) //subcolony
+    "9"=>array("type" => 9, "levelRequired"=>1, "points" => 2, "count" =>8, "size"=>3), //aphid/scavenging (8)
+    "10"=>array("type" => 10, "levelRequired"=>3, "points" => 4, "count" =>8, "size"=>4) //subcolony (8)
 );
+
+$this->bugTileTypes = array(
+    "11"=>array("type" => 11, "points" => 0, "count" =>6, "isBug"=> true, "resourceName"=>"ladybug"), //ladybug
+    "12"=>array("type" => 12, "points" => 2, "count" =>6, "isBug"=> true, "resourceName"=>"termite"), //termite
+    "13"=>array("type" => 13, "points" => 4, "count" =>6, "isBug"=> true, "resourceName"=>"spider")//spider
+    );
 
 $this->hexInfo = array(array());
 $this->hexInfo[9][0] = "mushroom";
 $this->hexInfo[10][0] = "grass";
+
+$this->bugLocations = array(
+    array("x" => 7, "y" => 1),
+    array("x" => 13, "y" => 1),
+    array("x" => 7, "y" => 4),
+    array("x" => 10, "y" => 4),
+    array("x" => 8, "y" => 5),
+    array("x" => 6, "y" => 6),
+    array("x" => 9, "y" => 6),
+    array("x" => 1, "y" => 7),
+    array("x" => 4, "y" => 7),
+    array("x" => 10, "y" => 7),
+    array("x" => 13, "y" => 7),
+    array("x" => 5, "y" => 8),
+    array("x" => 8, "y" => 8),
+    array("x" => 6, "y" => 9),    
+    array("x" => 4, "y" => 10),
+    array("x" => 7, "y" => 10),
+    array("x" => 1, "y" => 13),
+    array("x" => 7, "y" => 13),
+    );
 
 $this->startPositions2p = array(
     array("x" => 2, "y" => 11),
@@ -79,6 +155,82 @@ $this->startPositions4p = array(
     );
 
 $this->boardSpaces =array(array());
+
+$this->boardSpaces[9][0] = "MUSHROOM";
+$this->boardSpaces[10][0] = "GRASS";
+$this->boardSpaces[11][0] = "GRASS";
+$this->boardSpaces[12][0] = "MUSHROOM";
+
+$this->boardSpaces[7][1] = "GRASS";
+$this->boardSpaces[8][1] = "DIRT";
+$this->boardSpaces[9][1] = "GRASS";
+$this->boardSpaces[10][1] = "STONE";
+$this->boardSpaces[11][1] = "GRASS";
+$this->boardSpaces[12][1] = "DIRT";
+$this->boardSpaces[13][1] = "GRASS";
+
+$this->boardSpaces[5][2] = "GRASS";
+$this->boardSpaces[6][2] = "DIRT";
+$this->boardSpaces[7][2] = "DIRT";
+$this->boardSpaces[8][2] = "GRASS";
+$this->boardSpaces[9][2] = "MUSHROOM";
+$this->boardSpaces[10][2] = "MUSHROOM";
+$this->boardSpaces[11][2] = "GRASS";
+$this->boardSpaces[12][2] = "DIRT";
+$this->boardSpaces[13][2] = "DIRT";
+$this->boardSpaces[14][2] = "GRASS";
+
+$this->boardSpaces[4][3] = "STONE";
+$this->boardSpaces[5][3] = "MUSHROOM";
+$this->boardSpaces[6][3] = "GRASS";
+$this->boardSpaces[7][3] = "STONE";
+$this->boardSpaces[8][3] = "GRASS";
+$this->boardSpaces[9][3] = "WATER";
+$this->boardSpaces[10][3] = "GRASS";
+$this->boardSpaces[11][3] = "STONE";
+$this->boardSpaces[12][3] = "GRASS";
+$this->boardSpaces[13][3] = "MUSHROOM";
+$this->boardSpaces[14][3] = "STONE";
+
+$this->boardSpaces[3][4] = "GRASS";
+$this->boardSpaces[4][4] = "WATER";
+$this->boardSpaces[5][4] = "MUSHROOM";
+$this->boardSpaces[6][4] = "DIRT";
+$this->boardSpaces[7][4] = "GRASS";
+$this->boardSpaces[8][4] = "WATER";
+$this->boardSpaces[9][4] = "WATER";
+$this->boardSpaces[10][4] = "GRASS";
+$this->boardSpaces[11][4] = "DIRT";
+$this->boardSpaces[12][4] = "MUSHROOM";
+$this->boardSpaces[13][4] = "WATER";
+$this->boardSpaces[14][4] = "GRASS";
+
+$this->boardSpaces[2][5] = "DIRT";
+$this->boardSpaces[3][5] = "DIRT";
+$this->boardSpaces[4][5] = "MUSHROOM";
+$this->boardSpaces[5][5] = "STONE";
+$this->boardSpaces[6][5] = "WATER";
+$this->boardSpaces[7][5] = "MUSHROOM";
+$this->boardSpaces[8][5] = "GRASS";
+$this->boardSpaces[9][5] = "MUSHROOM";
+$this->boardSpaces[10][5] = "WATER";
+$this->boardSpaces[11][5] = "STONE";
+$this->boardSpaces[12][5] = "MUSHROOM";
+$this->boardSpaces[13][5] = "DIRT";
+$this->boardSpaces[14][5] = "DIRT";
+
+$this->boardSpaces[2][6] = "STONE";
+$this->boardSpaces[3][6] = "GRASS";
+$this->boardSpaces[4][6] = "GRASS";
+$this->boardSpaces[5][6] = "WATER";
+$this->boardSpaces[6][6] = "GRASS";
+$this->boardSpaces[7][6] = "GRASS";
+$this->boardSpaces[8][6] = "GRASS";
+$this->boardSpaces[9][6] = "GRASS";
+$this->boardSpaces[10][6] = "WATER";
+$this->boardSpaces[11][6] = "GRASS";
+$this->boardSpaces[12][6] = "GRASS";
+$this->boardSpaces[13][6] = "STONE";
 
 $this->boardSpaces[1][7] = "GRASS";
 $this->boardSpaces[2][7] = "DIRT";
@@ -169,99 +321,6 @@ $this->boardSpaces[2][14] = "STONE";
 $this->boardSpaces[3][14] = "GRASS";
 $this->boardSpaces[4][14] = "GRASS";
 $this->boardSpaces[5][14] = "STONE";
-
-/*$this->boardSpaces = array(
-    array("x" => 9, "y" => 0, "type" => "MUSHROOM"),
-    array("x" => 10, "y" => 0, "type" => "GRASS"),
-    array("x" => 11, "y" => 0, "type" => "GRASS"),
-    array("x" => 12, "y" => 0, "type" => "MUSHROOM"),
-    
-    array("x" => 7, "y" => 1, "type" => "GRASS"),
-    array("x" => 8, "y" => 1, "type" => "DIRT"),
-    array("x" => 9, "y" => 1, "type" => "GRASS"),
-    array("x" => 10, "y" => 1, "type" => "STONE"),
-    array("x" => 11, "y" => 1, "type" => "GRASS"),
-    array("x" => 12, "y" => 1, "type" => "DIRT"),
-    array("x" => 13, "y" => 1, "type" => "GRASS"),
-    
-    array("x" => 5, "y" => 2, "type" => "GRASS"),
-    array("x" => 6, "y" => 2, "type" => "DIRT"),
-    array("x" => 7, "y" => 2, "type" => "DIRT"),
-    array("x" => 8, "y" => 2, "type" => "GRASS"),
-    array("x" => 9, "y" => 2, "type" => "MUSHROOM"),
-    array("x" => 10, "y" => 2, "type" => "MUSHROOM"),
-    array("x" => 11, "y" => 2, "type" => "GRASS"),
-    array("x" => 12, "y" => 2, "type" => "DIRT"),
-    array("x" => 13, "y" => 2, "type" => "DIRT"),
-    array("x" => 14, "y" => 2, "type" => "GRASS"),
-    
-    array("x" => 4, "y" => 3, "type" => "STONE"),
-    array("x" => 5, "y" => 3, "type" => "MUSHROOM"),
-    array("x" => 6, "y" => 3, "type" => "GRASS"),
-    array("x" => 7, "y" => 3, "type" => "STONE"),
-    array("x" => 8, "y" => 3, "type" => "GRASS"),
-    array("x" => 9, "y" => 3, "type" => "WATER"),
-    array("x" => 10, "y" => 3, "type" => "GRASS"),
-    array("x" => 11, "y" => 3, "type" => "STONE"),
-    array("x" => 12, "y" => 3, "type" => "GRASS"),
-    array("x" => 13, "y" => 3, "type" => "MUSHROOM"),
-    array("x" => 14, "y" => 3, "type" => "STONE"),
-
-    array("x" => 3, "y" => 4, "type" => "GRASS"),
-    array("x" => 4, "y" => 4, "type" => "WATER"),
-    array("x" => 5, "y" => 4, "type" => "MUSHROOM"),
-    array("x" => 6, "y" => 4, "type" => "DIRT"),
-    array("x" => 7, "y" => 4, "type" => "GRASS"),
-    array("x" => 8, "y" => 4, "type" => "WATER"),
-    array("x" => 9, "y" => 4, "type" => "WATER"),
-    array("x" => 10, "y" => 4, "type" => "GRASS"),
-    array("x" => 11, "y" => 4, "type" => "DIRT"),
-    array("x" => 12, "y" => 4, "type" => "MUSHROOM"),
-    array("x" => 13, "y" => 4, "type" => "WATER"),
-    array("x" => 14, "y" => 4, "type" => "GRASS"),    
-    
-    array("x" => 2, "y" => 5, "type" => "DIRT"),
-    array("x" => 3, "y" => 5, "type" => "DIRT"),
-    array("x" => 4, "y" => 5, "type" => "MUSHROOM"),
-    array("x" => 5, "y" => 5, "type" => "STONE"),
-    array("x" => 6, "y" => 5, "type" => "WATER"),
-    array("x" => 7, "y" => 5, "type" => "MUSHROOM"),
-    array("x" => 8, "y" => 5, "type" => "GRASS"),
-    array("x" => 9, "y" => 5, "type" => "MUSHROOM"),
-    array("x" => 10, "y" => 5, "type" => "WATER"),
-    array("x" => 11, "y" => 5, "type" => "STONE"),
-    array("x" => 12, "y" => 5, "type" => "MUSHROOM"),
-    array("x" => 13, "y" => 5, "type" => "DIRT"),
-    array("x" => 14, "y" => 5, "type" => "DIRT"),  
-    
-    array("x" => 2, "y" => 6, "type" => "STONE"),
-    array("x" => 3, "y" => 6, "type" => "GRASS"),
-    array("x" => 4, "y" => 6, "type" => "GRASS"),
-    array("x" => 5, "y" => 6, "type" => "WATER"),
-    array("x" => 6, "y" => 6, "type" => "GRASS"),
-    array("x" => 7, "y" => 6, "type" => "GRASS"),
-    array("x" => 8, "y" => 6, "type" => "GRASS"),
-    array("x" => 9, "y" => 6, "type" => "GRASS"),
-    array("x" => 10, "y" => 6, "type" => "WATER"),
-    array("x" => 11, "y" => 6, "type" => "GRASS"),
-    array("x" => 12, "y" => 6, "type" => "GRASS"),
-    array("x" => 13, "y" => 6, "type" => "STONE"),
-
-    array("x" => 1, "y" => 7, "type" => "STONE"),
-    array("x" => 2, "y" => 7, "type" => "STONE"),
-    array("x" => 3, "y" => 7, "type" => "GRASS"),
-    array("x" => 4, "y" => 7, "type" => "GRASS"),
-    array("x" => 5, "y" => 7, "type" => "WATER"),
-    array("x" => 6, "y" => 7, "type" => "GRASS"),
-    array("x" => 7, "y" => 7, "type" => "GRASS"),
-    array("x" => 8, "y" => 7, "type" => "GRASS"),
-    array("x" => 9, "y" => 7, "type" => "GRASS"),
-    array("x" => 10, "y" => 7, "type" => "WATER"),
-    array("x" => 11, "y" => 7, "type" => "GRASS"),
-    array("x" => 12, "y" => 7, "type" => "GRASS"),
-    array("x" => 13, "y" => 7, "type" => "STONE"),    
-    
-);*/
         
 
 

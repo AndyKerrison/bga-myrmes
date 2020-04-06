@@ -65,24 +65,34 @@ $machinestates = array(
 
     2 => array(
         "name" => "event",
-        "action"=> "stEvent",
+        "action"=> "", //"stEvent",
         "type" => "game",
-        "transitions" => array( "" => 5)
+        "updateGameProgression" => true,
+        "transitions" => array( "" => 4)
+    ),
+    
+    4 => array(
+        "name" => "prepBirths",
+        "type" => "game",
+        "action"=> "stBirths",
+        "updateGameProgression" => true,
+        "transitions" => array( ""  => 5)
     ),
     
     5 => array(
         "name" => "births",
-        "type" => "multipleactiveplayer",
-        "action"=> "stBirths",
+        "type" => "multipleactiveplayer",        
         "args" => "argBirths",
+        "updateGameProgression" => true,
         "description" => clienttranslate('Waiting for other players to choose their event and births'),
         "descriptionmyturn" => clienttranslate('You must choose your event and births'),
-        "possibleactions" => array( "allocateNurse", "finished" ),
+        "possibleactions" => array("allocateNurse", "finished"),
         "transitions" => array( ""  => 7)
     ),
-    
+        
     7 => array(
         "name" => "processBirths",
+        "updateGameProgression" => true,
         "description" => clienttranslate('Processing Births...'),
         "type" => "game",
         "action" => "stProcessBirths",
@@ -93,6 +103,7 @@ $machinestates = array(
         "name" => "initWorkerPhase",
         "type" => "game",
         "action" => "stSetFirstPlayerActive",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 9)
     ),
     
@@ -100,23 +111,26 @@ $machinestates = array(
         "name" => "checkAvailableWorker",
         "type" => "game",
         "action" => "stNextAvailableWorker",
-        "transitions" => array( "hasWorker" => 10, "allWorkersPlaced"=> 30)
+        "updateGameProgression" => true,
+        "transitions" => array( "hasWorker" => 10, "allWorkersPlaced"=> 28)
     ),
     
     10 => array(
         "name" => "placeWorker",
         "type" => "activeplayer",
         "args" => "argPlaceWorker",
+        "updateGameProgression" => true,
         "description" => clienttranslate('${actplayer} must place a worker'),
         "descriptionmyturn" => clienttranslate('You must place a worker on the board, in your colony, or pass'),
-        "possibleactions" => array( "activateColony", "placeWorker", "pass" ),
-        "transitions" => array("workerPlaced"=> 12, "workerFinished" => 20, "pass" => 11) //there will be more here!
+        "possibleactions" => array("pass", "selectHex", "activateColony"),
+        "transitions" => array("workerPlaced"=> 12, "workerFinished" => 20, "pass" => 11, "zombiePass" => 11)
     ),
     
     11 => array(
         "name" => "workerPass",
         "type" => "game",
         "action" => "stWorkerPass",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 20)
     ),
     
@@ -124,26 +138,40 @@ $machinestates = array(
         "name" => "moveWorker",
         "type" => "activeplayer",
         "args" => "argMoveWorker",
+        "updateGameProgression" => true,
         "description" => clienttranslate('${actplayer} is moving a worker'),
         "descriptionmyturn" => clienttranslate('You may move the worker. ${moves} moves remaining'),
-        "possibleactions" => array("moveWorker", "clearPheromone", "placeTile"),
-        "transitions" => array("workerMoved" => 12, "workerUsed" => 15, "chooseTile" => 13)        
+        "possibleactions" => array("discardWorker", "selectHex", "placeTile", "clearPheromone"),
+        "transitions" => array("workerMoved" => 12, "workerUsed" => 15, "chooseTile" => 13, "zombiePass"=> 15)        
     ),
     
     13 => array(
         "name" => "placeTile",
         "type" => "activeplayer",
         "args" => "argPlaceTile",
+        "updateGameProgression" => true,
         "description" => clienttranslate('${actplayer} is placing a tile'),
         "descriptionmyturn" => clienttranslate('Select the tiles to cover, and confirm'),
-        "possibleactions" => array("confirmTile", "cancel"),
-        "transitions" => array("tileChoiceRequired" => 14, "tilePlaced" => 15, "cancel" => 12)        
+        "possibleactions" => array("cancel", "selectHex", "confirmTile"),
+        "transitions" => array("multiTileChoice" => 14, "tilePlaced" => 15, "cancel" => 12, "zombiePass"=>12)        
+    ),
+    
+    14 => array(
+        "name" => "tileChoice",
+        "type" => "activeplayer",
+        "args" => "argMultiTile",
+        "updateGameProgression" => true,
+        "description" => clienttranslate('${actplayer} is placing a tile'),
+        "descriptionmyturn" => clienttranslate('Select the tile to place'),
+        "possibleactions" => array("cancel", "selectTile"),
+        "transitions" => array("tilePlaced" => 15, "cancel" => 12, "zombiePass"=>12)        
     ),
     
     15 => array(
         "name" => "workerUsed",
         "type" => "game",
         "action" => "stWorkerUsed",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 20)
     ),
     
@@ -151,25 +179,35 @@ $machinestates = array(
         "name" => "workerFinished",
         "type" => "game",
         "action" => "stWorkerFinished",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 9)
+    ),
+    
+    28 => array(
+        "name" => "prepHarvest",
+        "type" => "game",
+        "action"=> "stHarvest",
+        "updateGameProgression" => true,
+        "transitions" => array( ""  => 30)
     ),
     
     30 => array(
         "name" => "harvest",
         "type" => "multipleactiveplayer",
-        "action"=> "stHarvest",
-        //"args" => "argBirths",
+        "args" => "argHarvest",
+        "updateGameProgression" => true,
         "description" => clienttranslate('Waiting for other players to choose their harvests'),
-        "descriptionmyturn" => clienttranslate('You must choose your harvest'),
-        "possibleactions" => array( "pass"),
-        "transitions" => array( ""  => 32)
+        "descriptionmyturn" => clienttranslate('You must choose your harvest. Select one cube from each tile, and up to three extra if you chose the harvest event'),
+        "possibleactions" => array("selectHex", "chooseHarvest"),
+        "transitions" => array( ""  => 31)
     ),
       
     //here or in state 30? depends if other player results should be hidden
     31 => array(
         "name" => "harvestEvaluate",
         "type" => "game",
-        //"action" => "stAtelierPass",
+        "action" => "stProcessHarvest",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 32)
     ),
     
@@ -177,6 +215,7 @@ $machinestates = array(
         "name" => "initAtelierPhase",
         "type" => "game",
         "action" => "stSetFirstPlayerActive",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 33)
     ),
     
@@ -184,32 +223,57 @@ $machinestates = array(
         "name" => "checkAvailableNurse",
         "type" => "game",
         "action" => "stNextAvailableNurse",
+        "updateGameProgression" => true,
         "transitions" => array( "hasNurse" => 35, "allNursesPlaced"=> 40)
     ),
         
     35 => array(
         "name" => "atelier",
         "type" => "activeplayer",
+        "args" => "argAtelier",
+        "updateGameProgression" => true,
         "description" => clienttranslate('${actplayer} must choose an action in the atelier'),
         "descriptionmyturn" => clienttranslate('You must choose an action in the atelier'),
-        "possibleactions" => array("pass"),
-        "transitions" => array("pass" => 36)
+        "possibleactions" => array( "pass", "selectHex", "convertLarvae" ),
+        "transitions" => array("zombiePass" => 36, "pass" => 36, "nurse" => 33, "level" => 33, "tunnel"=>37, "larvae" => 35)
     ),
     
     36 => array(
         "name" => "atelierPass",
         "type" => "game",
         "action" => "stAtelierPass",
+        "updateGameProgression" => true,
         "transitions" => array( "" => 33)
     ),
-        
+    
+    37 => array(
+        "name" => "placeTunnel",
+        "type" => "activeplayer",
+        "args" => "argPlaceTunnel",
+        "updateGameProgression" => true,
+        "description" => clienttranslate('${actplayer} is placing a tunnel'),
+        "descriptionmyturn" => clienttranslate('Select the location for the new tunnel'),
+        "possibleactions" => array("cancel", "selectHex"),
+        "transitions" => array("cancel" => 35, "tilePlaced"=>33, "zombiePass"=>35)        
+    ),
+    
     40 => array(
+        "name" => "prepStorage",
+        "type" => "game",
+        "action"=> "stStorage",
+        "updateGameProgression" => true,
+        "transitions" => array( ""  => 42)
+    ),    
+    
+    42 => array(
         "name" => "storage",
-        "type" => "multipleactiveplayer",
-        "action" => "stStorage",
+        "type" => "multipleactiveplayer",      
+        "action"=> "stStorage2",
+        "args"=> "argStorage",
+        "updateGameProgression" => true,
         "description" => clienttranslate('Waiting for other players to discard excess resources'),
         "descriptionmyturn" => clienttranslate('You must discard excess resources'),
-        "possibleactions" => array( "pass"),
+        "possibleactions" => array( "discard" ),
         "transitions" => array( ""  => 45)        
     ),
     
@@ -217,39 +281,38 @@ $machinestates = array(
         "name" => "cleanup",
         "type" => "game",
         "action" => "stCleanup",
+        "updateGameProgression" => true,
         "transitions" => array("winter" => 50, "startNextSeason" => 2, "endGame" => 99)
     ),
     
     50 => array(
+        "name" => "prepWinter",
+        "type" => "game",
+        "action" => "stPreWinter",
+        "updateGameProgression" => true,
+        "transitions" => array("" => 51)
+    ),
+    
+    51 => array(
         "name" => "winter",
+        "type" => "multipleactiveplayer",
+        "description" => clienttranslate('Waiting for other players to feed their colony'),
+        "descriptionmyturn" => clienttranslate('You may convert larvae into food to meet feeding requirements'),
+        "args"=> "argWinter",
+        "action" => "stWinterFoodCheck",
+        "possibleactions" => array( "pass", "convertLarvae"),
+        "updateGameProgression" => true,
+        "transitions" => array("" => 52)
+    ),
+    
+    52 => array(
+        "name" => "processWinter",
         "type" => "game",
         "action" => "stWinter",
+        "updateGameProgression" => true,
         "transitions" => array("" => 45)
     ),
-    
-/*
-    Examples:
-    
-    2 => array(
-        "name" => "nextPlayer",
-        "description" => '',
-        "type" => "game",
-        "action" => "stNextPlayer",
-        "updateGameProgression" => true,   
-        "transitions" => array( "endGame" => 99, "nextPlayer" => 10 )
-    ),
-    
-    10 => array(
-        "name" => "playerTurn",
-        "description" => clienttranslate('${actplayer} must play a card or pass'),
-        "descriptionmyturn" => clienttranslate('${you} must play a card or pass'),
-        "type" => "activeplayer",
-        "possibleactions" => array( "playCard", "pass" ),
-        "transitions" => array( "playCard" => 2, "pass" => 2 )
-    ), 
-
-*/    
-   
+      
     // Final state.
     // Please do not modify.
     99 => array(

@@ -51,6 +51,13 @@ class action_akmyrmes extends APP_GameAction
         self::ajaxResponse();
     }
     
+    public function clearPheromone()
+    {
+        self::setAjaxMode();     
+        $this->game->onClearPheromone();
+        self::ajaxResponse();
+    }
+    
     public function hexClicked()
     {
         self::setAjaxMode(); 
@@ -58,6 +65,16 @@ class action_akmyrmes extends APP_GameAction
         $x = self::getArg( "x", AT_alphanum, true );
         $y = self::getArg( "y", AT_alphanum, true );
         $this->game->onHexClicked($x, $y);
+
+        self::ajaxResponse();
+    }
+    
+    public function atelierClicked()
+    {
+        self::setAjaxMode(); 
+                
+        $action = self::getArg( "atelier", AT_alphanum, true );
+        $this->game->onAtelierClicked($action);
 
         self::ajaxResponse();
     }
@@ -90,6 +107,15 @@ class action_akmyrmes extends APP_GameAction
         self::ajaxResponse();
     }
     
+    public function multiPass()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onMultiPass();
+
+        self::ajaxResponse();
+    }
+    
     public function startPlaceTile()
     {
         self::setAjaxMode(); 
@@ -108,6 +134,16 @@ class action_akmyrmes extends APP_GameAction
         self::ajaxResponse();
     }
     
+    public function multiTileChoice()
+    {
+        self::setAjaxMode(); 
+                
+        $type_id = self::getArg( "type_id", AT_alphanum, true );
+        $this->game->onMultiTileChosen($type_id);
+
+        self::ajaxResponse();
+    }
+    
     public function confirmTile()
     {
         self::setAjaxMode(); 
@@ -121,17 +157,54 @@ class action_akmyrmes extends APP_GameAction
     public function harvestChosen()
     {
         self::setAjaxMode(); 
-                
-        $this->game->harvestChosen();
+
+        $hexes = self::getArg( "hexes", AT_alphanum, true );
+        $this->game->onHarvestChosen($hexes);
 
         self::ajaxResponse();
     }
     
-    public function storageChosen()
+    public function storageDiscardFood()
     {
         self::setAjaxMode(); 
                 
-        $this->game->storageChosen();
+        $this->game->onStorageDiscard("FOOD");
+
+        self::ajaxResponse();
+    }
+    
+    public function storageDiscardDirt()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onStorageDiscard("DIRT");
+
+        self::ajaxResponse();
+    }
+    
+    public function storageDiscardStone()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onStorageDiscard("STONE");
+
+        self::ajaxResponse();
+    }
+    
+    public function onDiscardWorker()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onDiscardWorker();
+
+        self::ajaxResponse();
+    }
+    
+    public function onConvertLarvae()
+    {
+        self::setAjaxMode(); 
+                
+        $this->game->onConvertLarvae();
 
         self::ajaxResponse();
     }

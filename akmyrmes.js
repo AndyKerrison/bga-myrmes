@@ -18,9 +18,10 @@
 define([
     "dojo","dojo/_base/declare",
     "ebg/core/gamegui",
-    "ebg/counter"
+    "ebg/counter",
+    "dojo/dom-class"
 ],
-function (dojo, declare) {
+function (dojo, declare, domClass) {
     return declare("bgagame.akmyrmes", ebg.core.gamegui, {
         constructor: function(){
             console.log('akmyrmes constructor');
@@ -48,6 +49,39 @@ function (dojo, declare) {
         {
             console.log( "Starting game setup" );
             console.log(gamedatas);
+            this.maxWorkerCount = gamedatas.maxWorkerCount;
+            this.maxNurseCount = gamedatas.maxNurseCount;
+			
+			//set up event board
+			var event_board_div = $('eventBoard');
+			if (gamedatas.current_season <=3) //show fall event
+			{
+				dojo.place(this.format_block('jstpl_dice', {
+                    id: "fall",
+                    number: gamedatas.fall_event
+                }), event_board_div);
+				this.placeOnObjectPos("event_fall", "eventBoard", 40, 0);
+			}
+			if (gamedatas.current_season <=2) //show summer event
+			{
+				dojo.place(this.format_block('jstpl_dice', {
+                    id: "summer",
+                    number: gamedatas.summer_event
+                }), event_board_div);
+				this.placeOnObjectPos("event_summer", "eventBoard", -30, 0);
+			}
+			if (gamedatas.current_season <=1) //show spring event
+			{
+				dojo.place(this.format_block('jstpl_dice', {
+                    id: "spring",
+                    number: gamedatas.spring_event
+                }), event_board_div);
+				this.placeOnObjectPos("event_spring", "eventBoard", -100, 0);				
+			}			
+			//show year
+			dojo.place(this.format_block('jstpl_year', {                    
+                }), event_board_div);
+			this.placeOnObjectPos("yearMarker", "eventBoard", 95, -15+(gamedatas.current_year-1)*15);
             
             // Setting up player boards
             for( var player_id in gamedatas.players )
@@ -66,13 +100,30 @@ function (dojo, declare) {
                 this.setPlayerResourceCount(player_id, "stone", player['stone']);
                 this.setPlayerResourceCount(player_id, "dirt", player['dirt']);
                 this.setPlayerResourceCount(player_id, "colony", player['colony']);
-                
+                                
                 //this.addTooltip("strawicon_"+player_id, this.strStrawTooltip, '');
                 //this.addTooltip("woodicon_"+player_id, this.strWoodTooltip, '');
-                //this.addTooltip("stoneicon_"+player_id, this.strStoneTooltip, '');               
+                //this.addTooltip("stoneicon_"+player_id, this.strStoneTooltip, ''); 
+                
+                var elementID = "stock_"+player_id+"_worker";
+                if (dojo.byId(elementID) != null)
+                {
+                    $(elementID).innerHTML = this.maxWorkerCount - player['soldiers'] - player['workers'];                    
+                }
+                
+                elementID = "stock_"+player_id+"_nurse";
+                if (dojo.byId(elementID) != null)
+                {
+                    $(elementID).innerHTML = this.maxNurseCount - player['nurses'];                    
+                }
             }
             
-            // TODO: Set up your game interface here, according to "gamedatas"
+            //tile counts
+            console.log("loading tile counts")
+            this.setTileCounts(gamedatas.tileCounts);
+            this.setSpecialTileCounts(gamedatas.specialTileCounts);
+            
+            //set up hexes here
             dojo.query('.js-larvae').connect('onclick', this, 'onNurseAllocation');  
             dojo.query('.js-colony').connect('onclick', this, 'onColonyActivated');  
             dojo.query('.hex').connect('onclick', this, 'onHexClicked');
@@ -80,42 +131,25 @@ function (dojo, declare) {
             var tunnels = gamedatas['tunnels'];
             for(var i=0; i<tunnels.length; i++)
             {
+                var hexID = "hex_"+tunnels[i].x1+"_"+tunnels[i].y1;
+                
                 dojo.place(
                 this.format_block('jstpl_tunnel', {
                     id: "tile_"+tunnels[i]['tile_id'],
                     color: tunnels[i]['color']
-                }), "hex_"+tunnels[i].x1+"_"+tunnels[i].y1);
-                this.placeOnObject("tile_"+tunnels[i]['tile_id'], "hex_"+tunnels[i].x1+"_"+tunnels[i].y1);
+                }), hexID);
+                this.placeOnObject("tile_"+tunnels[i]['tile_id'], hexID);
             }
             
             var pheromones = gamedatas['pheromones'];
             for(var i=0; i<pheromones.length; i++)
             {
-                console.log("placing pheromone on " + pheromones[i].x1 + "," + pheromones[i].y1);
-                dojo.place(
-                this.format_block('jstpl_pheromone', {
-                    id: "tile_"+pheromones[i]['tile_id'],
-                    color: pheromones[i]['color'],
-                    type: pheromones[i]['type_id']
-                }), "hex_"+pheromones[i].x1+"_"+pheromones[i].y1);
-                this.placeOnObjectPos("tile_"+pheromones[i]['tile_id'], "hex_"+pheromones[i].x1+"_"+pheromones[i].y1, 0, 55/2);
-                
-                var rotation = -90+60*pheromones[i]['rotation'];
-                
-                dojo.style("tile_"+pheromones[i]['tile_id'], 'transform', 'rotate('+rotation+'deg)');
-                
-                /*dojo.animateProperty({
-                node: "tile_"+pheromones[i]['tile_id'],
-                duration: 500,
-                properties: {
-                    transform: { start: 'rotate(' + 0 * 60 + 'deg)', end: 'rotate(' + 1 * 60 + 'deg)' }
-                }
-                }).play();*/
+                this.placeTile(pheromones[i], false, 0);
             }
             
             if (gamedatas['activeWorker'] != null)
             {
-                this.placeActiveWorker(gamedatas['activeWorker'].x, gamedatas['activeWorker'].y);
+                this.placeActiveWorker(gamedatas['activeWorker'].x, gamedatas['activeWorker'].y, gamedatas['activeWorker'].color, 0, false);
             }
              
             // Setup game notifications to handle (see "setupNotifications" method below)
@@ -138,18 +172,41 @@ function (dojo, declare) {
             console.log(args);
             
             //clear active state
-            dojo.query('.active').removeClass('active');
+            //dojo.query('.active').removeClass('active');
+            var elems = document.querySelectorAll(".active");
+            [].forEach.call(elems, function(el) {
+                el.classList.remove("active");
+            });
             
+            elems = document.querySelectorAll(".selected");           
+            for (var i = 0, len = elems.length; i < len; i++) {
+                elems[i].classList.remove("selected");
+            }
+            
+            dojo.query('.currentEvent').removeClass('currentEvent');
+                        
             if (!this.isCurrentPlayerActive()) {
+                console.log("not active");
                 return;
             }
             
-            //dojo.removeClass('event_'+eventID, 'currentEvent');
-            //dojo.query('.larvae').style('display', 'none');     
+            //dojo.query('.larvae').style('display', 'none');   
             
             switch( stateName )
-            {
+            {           
+                //during a multiactivestate
+                //onUpdateActionButtons gets called with it's original args every time someone
+                //becomes inactive, which screws upthe button visibility
+                //entering state doesnt get called again, so this works
+                case 'storage' :
+                    this.foodCount = args.args._private.foodCount;
+                    this.dirtCount = args.args._private.dirtCount;
+                    this.stoneCount = args.args._private.stoneCount;
+                                   
+                    break;
+                        
                 case 'births':
+                    console.log("switch births");
                     var allocated = args.args._private.allocated;
                     var can_allocate = args.args._private.can_allocate;
                     var can_deallocate = args.args._private.can_deallocate;
@@ -182,7 +239,10 @@ function (dojo, declare) {
                         //var x = tunnels[item].x1;
                         //var y = tunnels[item].y1;
                         //dojo.addClass("hex_"+x+"_"+y, 'active');
-                        dojo.addClass(tunnels[item], 'active');
+                        //alert("placeWorker enabled on " + tunnels[item]);
+                        //dojo.addClass(tunnels[item], 'active');
+                        //dojo.attr(tunnels[item], 'class', 'active');
+                        document.getElementById("hexPoly_"+tunnels[item]).classList.add('active');
                     }
                     
                     break;
@@ -193,12 +253,13 @@ function (dojo, declare) {
                     {
                         //var x = validHexMoves[item].X;
                         //var y = validHexMoves[item].Y;
-                        //alert("hex_"+x+"_"+y);
+                        //alert("hexPoly_"+validHexMoves[item]);
                         //var elem = dojo.byId("hex_"+x+"_"+y);
                         //f(elem != null){
                             //dojo.addClass("hex_"+x+"_"+y, 'active');
                         //}
-                        dojo.addClass(validHexMoves[item], 'active');
+                        //dojo.addClass("hexPoly_"+validHexMoves[item], 'active');
+                        document.getElementById("hexPoly_"+validHexMoves[item]).classList.add('active');
                     }
                     
                     break;
@@ -208,21 +269,47 @@ function (dojo, declare) {
                     var hexes = args.args.hexes;
                     for (var item in hexes)
                     {
-                        dojo.addClass(hexes[item], 'active');
+                        //dojo.addClass("hexPoly_"+hexes[item], 'active');                        
+                        document.getElementById("hexPoly_"+hexes[item]).classList.add('active');
                     }
                     
+                    //select the current tile
+                    document.getElementById("hexPoly_"+this.activeWorkerX+"_"+this.activeWorkerY).classList.add('selected');
+                    
                     break;
-            
-            /* Example:
-            
-            case 'myGameState':
-            
-                // Show some HTML block at this game state
-                dojo.style( 'my_html_block_id', 'display', 'block' );
+                    
+                case 'placeTunnel':
+                                   
+                    var hexes = args.args.validTunnelSpaces;
+                    for (var item in hexes)
+                    {                        
+                        //dojo.addClass("hexPoly_"+hexes[item], 'active');                        
+                        document.getElementById("hexPoly_"+hexes[item]).classList.add('active');
+                    }                   
+                    
+                    break;
+
+                case 'harvest':
+                                  
+                    console.log(args.args._private.can_allocate);
+                    var hexes = args.args._private.can_allocate;
+                    for (var item in hexes)
+                    {
+                        document.getElementById("hexPoly_"+hexes[item]).classList.add('active');
+                    }                   
+                    
+                    break;    
                 
-                break;
-           */
-           
+                case 'atelier':
+                                  
+                    console.log(args.args.atelierActions);
+                    var actions = args.args.atelierActions;
+                    for (var item in actions)
+                    {
+                        document.getElementById("atelierPoly_"+actions[item]).classList.add('active');
+                    }                   
+                    
+                    break; 
            
             case 'dummmy':
                 break;
@@ -261,17 +348,22 @@ function (dojo, declare) {
         onUpdateActionButtons: function( stateName, args )
         {
             console.log( 'onUpdateActionButtons: '+stateName );
+            console.log(args);        
                       
             if( this.isCurrentPlayerActive() )
             {            
                 switch( stateName )
                 {
                     case 'births' :
-                        this.addActionButton( 'button_1_id', _('stuff'), 'onNurseAllocationFinished' ); 
+                        this.addActionButton( 'button_1_id', _('Finished'), 'onNurseAllocationFinished' ); 
                         break;
                         
                     case 'placeWorker' :
                     case 'atelier' :
+                        if (args["convertLarvae"])
+                        {
+                            this.addActionButton( 'button_convertLarvae', _('Convert 3 Larvae to 1 Food'), 'onConvertLarvae' );   
+                        }
                         this.addActionButton( 'button_pass', _('Pass'), 'onPass' ); 
                         break;
                     
@@ -279,18 +371,87 @@ function (dojo, declare) {
                         this.addActionButton( 'button_harvest', _('Done'), 'onHarvestChosen' ); 
                         break;
                         
-                    case 'storage' :
-                        this.addActionButton( 'button_storage', _('Done'), 'onStorageChosen' ); 
-                        break;
                     case 'moveWorker':
                         if (args["canPlaceTile"])
                         {
                            this.addActionButton('button_tile', _('Place Tile'), 'onPlaceTileButton');
                         }
+                        if (args["canClearPheromone"])
+                        {
+                           this.addActionButton('button_clear', _('Clear Pheromone'), 'onClearPheromone');
+                        }
+                        this.addActionButton('button_discard', _('Discard Worker'), 'onDiscardWorkerButton');
                         break;
                     case 'placeTile':
                         this.addActionButton('button_confirm', _('Confirm'), 'onConfirmTileButton');
                         this.addActionButton('button_cancel', _('Cancel'), 'onCancelButton');
+                        break;
+                    case 'placeTunnel':
+                        this.addActionButton('button_cancel', _('Cancel'), 'onCancelButton');
+                        break;
+                    case 'tileChoice':
+                        for(var i=0; i<args.tileTypes.length; i++)
+                        {
+                            var type_id = args.tileTypes[i];
+                            console.log("adding type "+ type_id);
+                            var tokenDiv = this.format_block('jstpl_pheromone', {
+                                id: "0",
+                                color: args.color,
+                                type: type_id,
+                                class: "button"
+                            });
+                            this.addImageActionButton('button_type_'+type_id, tokenDiv, 'onMultiTileChoice');                            
+                        }
+                        this.addActionButton('button_cancel', _('Cancel'), 'onCancelButton');
+            
+                        break;
+                                            
+                    //during a multiactivestate
+                    //onupdateActionButtons gets called with it's original args every time someone
+                    //becomes inactive, which screws upthe button visibility
+                    //entering state doesnt get called again, so this works
+                    case 'winter' :
+
+                        if (this.larvaeCount > 0)
+                        {
+                            this.addActionButton( 'button_convertLarvae', _('Convert 3 Larvae to 1 Food'), 'onConvertLarvae' );                          
+                        }    
+                        
+                        this.addActionButton('button_pass', _('Pass'), 'onMultiPass');
+                           
+                        break;                    
+                    case 'storage' :
+
+                        if (this.foodCount > 0)
+                        {
+                            var foodDiv = this.format_block('jstpl_resource', {
+                                id: "0",
+                                tokenType: "FOOD",
+                                class: "btnRes"
+                            });
+                            this.addImageActionButton('button_discardFood', foodDiv, 'onStorageDiscardFood'); 
+                        }                    
+                        
+                        if (this.dirtCount > 0)
+                        {
+                            var dirtDiv = this.format_block('jstpl_resource', {
+                                id: "0",
+                                tokenType: "DIRT",
+                                class: "btnRes"
+                            });
+                            this.addImageActionButton('button_discardDirt', dirtDiv, 'onStorageDiscardDirt'); 
+                        }   
+                        
+                        if (this.stoneCount > 0)
+                        {
+                            var stoneDiv = this.format_block('jstpl_resource', {
+                                id: "0",
+                                tokenType: "STONE",
+                                class: "btnRes"
+                            });
+                            this.addImageActionButton('button_discardStone', stoneDiv, 'onStorageDiscardStone'); 
+                        }                        
+                        
                         break;
 /*               
                  Example:
@@ -318,16 +479,266 @@ function (dojo, declare) {
         
         */
         
-        //todo - will need a colour and id at some point.
-        placeActiveWorker: function(x, y)
+        addImageActionButton : function(id, div, handler) {
+            // this will actually make a transparent button
+            this.addActionButton(id, div, handler, '', false, 'gray');
+            // remove boarder, for images it better without
+            dojo.style(id, "border", "none");
+            // but add shadow style (box-shadow, see css)
+            dojo.addClass(id, "shadow");
+            // you can also add addition styles, such as background
+            // dojo.style(id, "background-color", "white");
+        },
+        
+        hasClass:function(nodeID, className)
+        {
+            var element = document.getElementById(nodeID);
+            return element.classList.contains(className);
+        },
+        
+        setTileCounts: function(tileCounts)
+        {
+            for( var tileCount in tileCounts )
+            {
+                var player_id = tileCounts[tileCount].player_id;
+                var type = tileCounts[tileCount].type_id;
+                var count = tileCounts[tileCount].count;
+                var elementID = "stock_"+player_id+"_"+type;
+                
+                //update storage counts
+                if (dojo.byId(elementID) != null)
+                {
+                    $(elementID).innerHTML = count;
+                }        
+            }
+        },
+        
+        //for the 'cube' marker in theplayer reserve, not the general available store
+        setSpecialTileCounts: function(tileCounts)
+        {
+            for( var tileCount in tileCounts )
+            {
+                var player_id = tileCounts[tileCount].player_id;
+                var count = tileCounts[tileCount].count;
+                var elementID = "stock_"+player_id+"_special";
+                
+                //update storage counts
+                if (dojo.byId(elementID) != null)
+                {
+                    $(elementID).innerHTML = count;
+                }        
+            }
+        },
+        
+        placeTile:function(tile, isFromPlayerBoard, player_id)
+        {
+            console.log(tile); 
+            var tileID = tile["tile_id"];
+            var subTypeID = tile["subtype_id"];
+            var color = tile["color"];
+            var typeID = tile["type_id"];
+            var x = tile["x1"];
+            var y = tile["y1"];
+            var tileRotation = tile["rotation"];
+            var playerID = tile["player_id"];
+            var scaleX = 1;
+            
+            if (tile["flipped"] === "1")
+            {
+                scaleX = -1;
+            }
+                       
+            var placePoint = "hex_"+x+"_"+y;
+            if (isFromPlayerBoard)
+            {
+                placePoint = "overall_player_board_" + playerID;
+            }
+            
+            var ydiff = 20;
+            var xdiff = 0;
+            
+            if (typeID == 3 || typeID == 9)
+            {
+                xdiff = 25;
+            }
+            if (typeID == 4)
+            {
+                ydiff = 40;
+            }
+            if (typeID == 5 || typeID == 10)
+            {
+                ydiff = 30;
+                xdiff = 20;
+            }
+            
+            if (typeID == 6)
+            {
+                ydiff = 45;
+                xdiff = 25;
+            }
+            
+            if (typeID == 7)
+            {
+                ydiff = 45;
+                xdiff = 20;
+            }
+            
+            if (typeID == 8)
+            {
+                ydiff = 40;
+                xdiff = 40;
+            }
+            
+            if (typeID > 10) //bugtiles
+            {
+                ydiff = 0;            
+            }
+                        
+            console.log("placing pheromone on " + x + "," + y);
+            var displayType = typeID;
+            if (typeID == 9)
+            {
+                displayType = subTypeID;
+            }
+
+            if (typeID == 1)
+            {
+                dojo.place(
+                this.format_block('jstpl_tunnel', {
+                    id: "tile_"+tileID,
+                    color: color                    
+                }), placePoint);
+            }
+            else
+            {
+                dojo.place(
+                this.format_block('jstpl_pheromone', {
+                    id: "tile_"+tileID,
+                    color: color,
+                    type: displayType,
+                    class: "tile"
+                }), placePoint);
+            }
+            this.placeOnObjectPos("tile_"+tileID, placePoint, xdiff, ydiff);
+                        
+            var rotation = -90+60*tileRotation;
+            if (typeID == 3 || typeID == 9)
+            {
+                rotation = -30+60*tileRotation;
+            }
+            if (typeID == 5 || typeID == 10)
+            {
+                rotation = -30+60*tileRotation;
+            }
+            if (typeID == 8)
+            {
+                rotation = 30+60*tileRotation;
+            }
+            
+            if (typeID > 10) //bugtiles
+            {            
+                rotation = 0;
+            }
+           
+            
+            //dojo.style("tile_"+tileID, 'transform', 'rotate('+rotation+'deg)');
+            
+            if (isFromPlayerBoard)
+            {
+                this.attachToNewParent("tile_"+tileID, "hex_"+x+"_"+y );                
+                this.slideToObjectPos("tile_"+tileID, "hex_"+x+"_"+y, 0, 0, 500, 500).play();                            
+            }
+            
+            dojo.style("tile_"+tileID, 'transform', 'rotate('+rotation+'deg) scaleX('+scaleX+')');
+            
+            //TODO -  tile needs resources too. 
+            //
+            //They must appear after tile is placed in the case of an active move
+            var delay = 0;
+            if (isFromPlayerBoard)
+            {
+                delay = 1500;
+            }
+            
+            var self = this;
+            setTimeout(function () {
+                self.placeResources(tile, player_id);                
+            }, delay);
+        },       
+        
+        placeResources: function(tile,player_id)
+        {
+            //var self = this;
+            var tileID = tile["tile_id"];
+            var typeID = tile["type_id"];
+            for (var i=1; i<=6; i++)
+            {
+                if(tile["res"+i].length > 0)
+                {
+                    var destination = "hex_"+tile["x"+i]+"_"+tile["y"+i];
+                    console.log("placing resource on " + destination);
+                    dojo.place(
+                    this.format_block('jstpl_resource', {
+                        id: "res_"+i+"_"+tileID,
+                        tokenType: tile["res"+i],
+                        class: "token"
+                    }), destination);  
+                    this.placeOnObjectPos("res_"+i+"_"+tileID, destination, 0, 0);
+                }                
+            }   
+            
+            if (typeID == 1 && player_id > 0)
+            {
+                var destination = "hex_"+tile["x1"]+"_"+tile["y1"];
+                console.log("placing resource on " + destination);
+                dojo.place(
+                    this.format_block('jstpl_resource', {
+                        id: "res_1_"+tileID,
+                        tokenType: "DIRT",
+                        class: "token"
+                    }), destination);  
+                this.placeOnObjectPos("res_1_"+tileID, destination, 0, 0);                     
+                this.slideToObjectAndDestroy("res_1_" + tileID, "overall_player_board_"+player_id, 750, 0);
+            }            
+        },
+        
+        destroyResources: function(tile)
+        {
+            //var self = this;
+            var tileID = tile["tile_id"];
+            for (var i=1; i<=6; i++)
+            {
+                var resID = "res_"+i+"_"+tileID;
+                if (dojo.byId(resID) !== null)
+                {
+                    dojo.destroy(resID);
+                }                
+            }            
+        },
+        
+        placeActiveWorker: function(x, y, color, playerID, isFromPlayerBoard)
         {
             this.activeWorkerX = x;
             this.activeWorkerY = y;
+            
+            var placePoint = "hex_"+x+"_"+y;
+            if (isFromPlayerBoard)
+            {
+                placePoint = "overall_player_board_" + playerID;
+            }
+            
             dojo.place(
                 this.format_block('jstpl_worker', {
-                    id: "worker_"+123,
-                }), "hex_"+x+"_"+y);
-            this.placeOnObject("worker_"+123, "hex_"+x+"_"+y);            
+                    id: "activeWorker",
+                    color: color
+                }), placePoint);
+            this.placeOnObject("activeWorker", placePoint); 
+            
+            if (isFromPlayerBoard)
+            {
+                this.attachToNewParent("activeWorker", "hex_"+x+"_"+y );                
+                this.slideToObjectPos("activeWorker", "hex_"+x+"_"+y, 0, 0, 500, 500).play();                
+            }
         },
         
         moveActiveWorker: function(x, y)
@@ -335,13 +746,36 @@ function (dojo, declare) {
             this.activeWorkerX = x;
             this.activeWorkerY = y;
             //this.placeOnObject("worker_"+123, "hex_"+x+"_"+y);
-            this.slideToObjectPos("worker_"+123, "hex_"+x+"_"+y, 0, 0, 500, 100).play();            
+            this.slideToObjectPos("activeWorker", "hex_"+x+"_"+y, 0, 0, 500, 100).play();            
         },
        
        
         setPlayerResourceCount: function (player_id, resource, count)
         {
             $(resource +'count_p'+player_id).innerHTML = count;
+            
+            if (player_id == this.player_id)
+            {
+                if (resource == "food")
+                {
+                    this.foodCount = count;
+                }
+                 
+                if (resource == "dirt")
+                {
+                    this.dirtCount = count;
+                }
+                
+                if (resource == "stone")
+                {
+                    this.stoneCount = count;
+                }
+                
+                if (resource == "larvae")
+                {
+                    this.larvaeCount = count;                    
+                }               
+            }
         },
        
        
@@ -385,30 +819,78 @@ function (dojo, declare) {
         {
             dojo.stopEvent( evt );           
             
-            //if( ! this.checkAction( 'pass' ) )
-            //{
-            //    return;
-            //}
-
+            if( ! this.checkAction( 'chooseHarvest' ) )
+            {
+                return;
+            }
+            
+            var selectedHexes = dojo.query('.selected');
+            console.log(selectedHexes);
+                        
+            var hexes = "";
+            for(var i = 0;i<selectedHexes.length; i++)
+            {
+                if (i > 0)
+                {
+                    hexes += "x";
+                }
+                var parts = selectedHexes[i].id.split('_');
+                hexes += parts[1] + "_" + parts[2];
+            }
+            
             this.ajaxcall( "/akmyrmes/akmyrmes/harvestChosen.html", { 
                     lock: true, 
+                    hexes: hexes
                 }, 
                 this, function( result ) { }, function( is_error) { } );        
         },
         
-        onStorageChosen: function(evt)
+        onStorageDiscardFood: function(evt)
         {
-            dojo.stopEvent( evt );           
+            dojo.stopEvent( evt );  
             
-            //if( ! this.checkAction( 'pass' ) )
-            //{
-            //    return;
-            //}
-
-            this.ajaxcall( "/akmyrmes/akmyrmes/storageChosen.html", { 
+            if( ! this.checkAction( 'discard' ) )
+            {
+                return;
+            }
+            
+            this.ajaxcall( "/akmyrmes/akmyrmes/storageDiscardFood.html", { 
                     lock: true, 
                 }, 
-                this, function( result ) { }, function( is_error) { } );        
+                this, function( result ) { }, function( is_error) { } 
+            );        
+        },
+        
+        onStorageDiscardDirt: function(evt)
+        {
+            dojo.stopEvent( evt );  
+            
+            if( ! this.checkAction( 'discard' ) )
+            {
+                return;
+            }
+            
+            this.ajaxcall( "/akmyrmes/akmyrmes/storageDiscardDirt.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } 
+            );        
+        },
+        
+        onStorageDiscardStone: function(evt)
+        {
+            dojo.stopEvent( evt );  
+            
+            if( ! this.checkAction( 'discard' ) )
+            {
+                return;
+            }
+            
+            this.ajaxcall( "/akmyrmes/akmyrmes/storageDiscardStone.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } 
+            );        
         },
        
         onPass: function(evt)
@@ -426,6 +908,21 @@ function (dojo, declare) {
                 this, function( result ) { }, function( is_error) { } );        
         },
         
+        onMultiPass: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'pass' ) )
+            {
+                return;
+            }
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/multiPass.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
+        
         onConfirmTileButton: function(evt)
         {
             dojo.stopEvent( evt );           
@@ -438,7 +935,8 @@ function (dojo, declare) {
             //client side validation
             // - we will validate that the current active hex is selected
             
-            if (!dojo.hasClass("hex_"+this.activeWorkerX+"_"+this.activeWorkerY, "selected"))
+            //if (!dojo.hasClass("hexPoly_"+this.activeWorkerX+"_"+this.activeWorkerY, "selected"))
+            if (!this.hasClass("hexPoly_"+this.activeWorkerX+"_"+this.activeWorkerY, "selected"))
             {
                 this.showMessage(this.strActiveTileRequired, 'error');   
                 return;
@@ -446,7 +944,7 @@ function (dojo, declare) {
             
             var selectedHexes = dojo.query('.selected');
             console.log(selectedHexes);
-            
+                        
             var hexes = "";
             for(var i = 0;i<selectedHexes.length; i++)
             {
@@ -494,6 +992,54 @@ function (dojo, declare) {
                 }, 
                 this, function( result ) { }, function( is_error) { } );        
         },
+        
+        onMultiTileChoice: function(evt)
+        {
+             dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'selectTile' ) )
+            {
+                return;
+            }
+            
+            var type_id = evt.currentTarget.id.split("_")[2];
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/multiTileChoice.html", { 
+                    lock: true, 
+                    type_id: type_id
+                }, 
+                this, function( result ) { }, function( is_error) { } );            
+        },
+        
+        onConvertLarvae: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'convertLarvae' ) )
+            {
+                return;
+            }
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/onConvertLarvae.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
+        
+        onDiscardWorkerButton: function(evt)
+        {
+            dojo.stopEvent( evt );           
+            
+            if( ! this.checkAction( 'discardWorker' ) )
+            {
+                return;
+            }
+
+            this.ajaxcall( "/akmyrmes/akmyrmes/onDiscardWorker.html", { 
+                    lock: true, 
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
        
         onNurseAllocationFinished: function(evt)
         {
@@ -521,37 +1067,82 @@ function (dojo, declare) {
         onHexSelected:function(evt)
         {
             dojo.stopEvent(evt);
+                        
+            var hexPoly = document.getElementById(evt.currentTarget.id);
             
-            if (!dojo.hasClass(evt.currentTarget.id, "active"))
+            if (!hexPoly.classList.contains('active'))
             {
                 return;
             }
             
-            if (!dojo.hasClass(evt.currentTarget.id, "selected"))
+            if( ! this.checkAction( 'selectHex' ) )
             {
-                dojo.addClass(evt.currentTarget.id, "selected");
+                return;
+            }
+            
+            if (!hexPoly.classList.contains('selected'))
+            {
+                hexPoly.classList.add("selected");
             }
             else 
             {
-                dojo.removeClass(evt.currentTarget.id, "selected");
+                hexPoly.classList.remove("selected");                
             }
+            
+            //if (!dojo.hasClass(evt.currentTarget.id, "active"))
+            //{
+            //    return;
+            //}
+            
+            //if (!dojo.hasClass(evt.currentTarget.id, "selected"))
+            //{
+            //    dojo.addClass(evt.currentTarget.id, "selected");
+            //}
+            //else 
+            //{
+            //    dojo.removeClass(evt.currentTarget.id, "selected");
+            //}
         },
         
         onHexClicked: function(evt)
-        {
+        {            
+            dojo.stopEvent(evt);
+                                
+            if (!this.hasClass(evt.currentTarget.id, 'active'))
+            {
+                return;
+            }
+            
+            if( ! this.checkAction( 'selectHex' ) )
+            {
+                return;
+            }
+                        
             if (this.stateName == "placeTile")
             {
                 this.onHexSelected(evt);
                 return;
             }
-            
-            dojo.stopEvent(evt);
-            
-            if (!dojo.hasClass(evt.currentTarget.id, "active"))
+            if (this.stateName == "harvest")
             {
+                this.onHexSelected(evt);
+                return;
+            }
+                        
+            if (this.stateName == "atelier")
+            {
+                var action = dojo.attr(evt.currentTarget.id, 'data-action');
+                
+                this.ajaxcall( "/akmyrmes/akmyrmes/atelierClicked.html", { 
+                    lock: true,
+                    atelier: action,
+                }, 
+                this, function() {}, function() {});  
                 return;
             }
             
+            
+            //normal click, submit x/y            
             var x = dojo.attr(evt.currentTarget.id, 'data-x');
             var y = dojo.attr(evt.currentTarget.id, 'data-y');
             
@@ -612,41 +1203,22 @@ function (dojo, declare) {
                 this, function( result ) { }, function( is_error) { } );        
         },
         
-        /* Example:
-        
-        onMyMethodToCall1: function( evt )
+        onClearPheromone: function(evt)
         {
-            console.log( 'onMyMethodToCall1' );
+            dojo.stopEvent( evt );           
             
-            // Preventing default browser reaction
-            dojo.stopEvent( evt );
-
-            // Check that this action is possible (see "possibleactions" in states.inc.php)
-            if( ! this.checkAction( 'myAction' ) )
-            {   return; }
-
-            this.ajaxcall( "/akmyrmes/akmyrmes/myAction.html", { 
-                                                                    lock: true, 
-                                                                    myArgument1: arg1, 
-                                                                    myArgument2: arg2,
-                                                                    ...
-                                                                 }, 
-                         this, function( result ) {
-                            
-                            // What to do after the server call if it succeeded
-                            // (most of the time: nothing)
-                            
-                         }, function( is_error) {
-
-                            // What to do after the server call in anyway (success or failure)
-                            // (most of the time: nothing)
-
-                         } );        
-        },        
+            if( ! this.checkAction( 'clearPheromone' ) )
+            {
+                return;
+            }
+            
+            this.ajaxcall( "/akmyrmes/akmyrmes/clearPheromone.html", { 
+                lock: true,                
+                }, 
+                this, function( result ) { }, function( is_error) { } );        
+        },
         
-        */
-
-        
+                
         ///////////////////////////////////////////////////
         //// Reaction to notifications
 
@@ -664,27 +1236,202 @@ function (dojo, declare) {
             console.log( 'notifications subscriptions setup' );
             
             dojo.subscribe( 'allocationConfirmed', this, "notif_allocationConfirmed" );
-            // TODO: here, associate your game notifications with local methods
-            
-            // Example 1: standard notification handling
-            // dojo.subscribe( 'cardPlayed', this, "notif_cardPlayed" );
-            
-            // Example 2: standard notification handling + tell the user interface to wait
-            //            during 3 seconds after calling the method in order to let the players
-            //            see what is happening in the game.
-            // dojo.subscribe( 'cardPlayed', this, "notif_cardPlayed" );
-            // this.notifqueue.setSynchronous( 'cardPlayed', 3000 );
-            // 
+
+            this.notifqueue.setSynchronous( 'pause', 1500 );
             
             dojo.subscribe( 'yourNursesAllocated', this, "notif_playerNursesAllocated" );
+            dojo.subscribe( 'birthing', this, "notif_birthing" );
             
             dojo.subscribe('workerPlaced', this, "notif_workerPlaced");
             dojo.subscribe('workerMoved', this, "notif_workerMoved");
+            dojo.subscribe('activeWorkerRemoved', this, "notif_activeWorkerRemoved");
+            
+            dojo.subscribe('soldierLost', this, "notif_soldierLost");
+            dojo.subscribe('bugEaten', this, "notif_bugEaten");
+            
+            dojo.subscribe('harvest', this, "notif_harvest");
+            this.notifqueue.setSynchronous( 'harvest', 1000 );
+            
+            dojo.subscribe('discard', this, "notif_discard");
             
             dojo.subscribe('tilePlacementInvalid', this, "notif_tilePlacementInvalid");
+            //this.notifqueue.setSynchronous( 'tilePlaced', 1100 );
+            dojo.subscribe('tilePlaced', this, "notif_tilePlaced");
+            dojo.subscribe('resourcesPlaced', this, "notif_resourcesPlaced");
+            dojo.subscribe('resourcesDestroyed', this, "notif_resourcesDestroyed");
+            dojo.subscribe('pheromoneCleared', this, "notif_pheromoneCleared");
+            
+            dojo.subscribe('setScore', this, "notif_setScore");
+            dojo.subscribe('setWorkers', this, "notif_setWorkers");
+            dojo.subscribe('setNurses', this, "notif_setNurses");
+            
+            dojo.subscribe('colonyActivated', this, "notif_colonyActivated");
+            dojo.subscribe('larvaeConverted', this, "notif_larvaeConverted");
+            dojo.subscribe('atelierNurseGained', this, "notif_atelierNurseGained");
+            dojo.subscribe('atelierLevelGained', this, "notif_atelierLevelGained");
         },  
         
-        // TODO: from this point and below, you can write your game notifications handling methods
+        //from this point and below, you can write your game notifications handling methods
+
+        notif_atelierLevelGained: function(notif)
+        {
+            //TODO - animate gain of level. Requires colony art
+            this.setPlayerResourceCount(notif.args.player_id, "stone", notif.args.stoneCount);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);            
+            this.setPlayerResourceCount(notif.args.player_id, "colony", notif.args.colonyLevel);            
+        },
+        
+        notif_atelierNurseGained: function(notif)
+        {
+            //TODO - animate usage and/or gain of nurse. Requires colony art
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "larvae", notif.args.larvaeCount);
+            //this.setPlayerResourceCount(notif.args.player_id, "nurse", notif.args.nurseCount);
+        },
+        
+        notif_colonyActivated: function(notif)
+        {
+            //TODO - animate usage and/or gain of nurse. Requires colony art
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "larvae", notif.args.larvaeCount);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);
+            this.setPlayerResourceCount(notif.args.player_id, "stone", notif.args.stoneCount);
+        },
+        
+        notif_larvaeConverted: function(notif)
+        {
+            //TODO - animate usage and/or gain of nurse. Requires colony art
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "larvae", notif.args.larvaeCount);            
+        },
+        
+        notif_activeWorkerRemoved: function(notif)
+        {
+            this.activeWorkerX = 0;
+            this.activeWorkerY = 0;
+            //dojo.destroy("activeWorker");
+            this.fadeOutAndDestroy("activeWorker");
+            //this.setPlayerResourceCount(notif.args.player_id, "worker", notif.args.workers);
+        },
+        
+        notif_pheromoneCleared: function(notif)
+        {
+            console.log(notif);
+            this.fadeOutAndDestroy("tile_"+notif.args.tile_id);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);
+        },
+        
+        notif_soldierLost: function(notif)
+        {
+            this.setPlayerResourceCount(notif.args.player_id, "soldier", notif.args.soldiers);
+        },
+        
+        notif_harvest: function(notif)
+        {
+            console.log(notif);
+            if (dojo.byId("res_" + notif.args.hex_id)!== null)
+            {
+                this.slideToObjectAndDestroy("res_" + notif.args.hex_id, "overall_player_board_"+notif.args.player_id, 750, 0);
+            }
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);
+            this.setPlayerResourceCount(notif.args.player_id, "stone", notif.args.stoneCount);
+        },
+        
+        notif_discard: function(notif)
+        {
+            console.log(notif);
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);
+            this.setPlayerResourceCount(notif.args.player_id, "stone", notif.args.stoneCount);
+            
+            if (this.player_id !== notif.args.player_id)
+            {
+                return;
+            }
+                        
+            if (notif.args.foodCount == 0 && dojo.byId('button_discardFood') !== null)            {
+                
+                dojo.destroy("button_discardFood");
+            }
+            
+            if (notif.args.dirtCount == 0 && dojo.byId('button_discardDirt') !== null)
+            {
+                dojo.destroy("button_discardDirt");
+            }
+            
+            if (notif.args.stoneCount == 0 && dojo.byId('button_discardStone') !== null)
+            {
+                dojo.destroy("button_discardStone");
+            }
+        },
+        
+        notif_bugEaten: function(notif)
+        {
+            console.log(notif);
+            this.slideToObjectAndDestroy("tile_" + notif.args.bugTileID, "overall_player_board_"+notif.args.player_id, 1000, 500);
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+        },
+        
+        notif_birthing: function(notif)
+        {
+            this.setPlayerResourceCount(notif.args.player_id, "larvae", notif.args.larvaeCount);
+            this.setPlayerResourceCount(notif.args.player_id, "soldier", notif.args.soldierCount);
+            //this.setPlayerResourceCount(notif.args.player_id, "worker", notif.args.workerCount);
+        },
+        
+        notif_tilePlaced: function(notif)
+        {
+            console.log(notif.args.tile);
+            this.placeTile(notif.args.tile, true, notif.args.player_id);
+            this.setTileCounts(notif.args.tileCounts);
+            this.setSpecialTileCounts(notif.args.specialTileCounts);
+            this.setPlayerResourceCount(notif.args.player_id, "food", notif.args.foodCount);
+            this.setPlayerResourceCount(notif.args.player_id, "stone", notif.args.stoneCount);
+            this.setPlayerResourceCount(notif.args.player_id, "dirt", notif.args.dirtCount);
+        },
+        
+        notif_resourcesPlaced: function(notif)
+        {
+            console.log(notif.args.tile);
+            this.placeResources(notif.args.tile, true);
+        },
+        
+        notif_resourcesDestroyed: function(notif)
+        {
+            console.log(notif.args.tile);
+            this.destroyResources(notif.args.tile, true);
+        },
+        
+        notif_setScore:function(notif)
+        {
+            if (this.scoreCtrl[notif.args.player_id] != null) {
+                this.scoreCtrl[notif.args.player_id].setValue(notif.args.score);
+            }
+        },
+        
+        notif_setWorkers:function(notif)
+        {
+            this.setPlayerResourceCount(notif.args.player_id, "worker", notif.args.workerCount);
+            
+            var elementID = "stock_"+notif.args.player_id+"_worker";
+            if (dojo.byId(elementID) != null)
+            {
+                $(elementID).innerHTML = notif.args.workersRemaining;
+            }   
+        },
+        
+        notif_setNurses:function(notif)
+        {
+            this.setPlayerResourceCount(notif.args.player_id, "nurse", notif.args.nurseCount);
+            
+            var elementID = "stock_"+notif.args.player_id+"_nurse";
+            if (dojo.byId(elementID) != null)
+            {
+                $(elementID).innerHTML = notif.args.nursesRemaining;
+            }   
+        },
+        
         notif_tilePlacementInvalid: function(notif)
         {
             this.showMessage(notif.args.errMsg, 'error');
@@ -697,7 +1444,7 @@ function (dojo, declare) {
         
         notif_workerPlaced: function(notif)
         {
-            this.placeActiveWorker(notif.args.x, notif.args.y);
+            this.placeActiveWorker(notif.args.x, notif.args.y, notif.args.color, notif.args.player_id, true);
         },
         
         notif_playerNursesAllocated:function(notif)
@@ -718,19 +1465,5 @@ function (dojo, declare) {
             this.setAllocation(allocated, can_allocate, can_deallocate);
         },    
         
-        /*
-        Example:
-        
-        notif_cardPlayed: function( notif )
-        {
-            console.log( 'notif_cardPlayed' );
-            console.log( notif );
-            
-            // Note: notif.args contains the arguments specified during you "notifyAllPlayers" / "notifyPlayer" PHP call
-            
-            // TODO: play the card in the user interface.
-        },    
-        
-        */
    });             
 });

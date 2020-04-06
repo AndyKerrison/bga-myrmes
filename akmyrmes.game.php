@@ -19,12 +19,11 @@
 
 require_once( APP_GAMEMODULE_PATH.'module/table/table.game.php' );
 
-require 'test.inc.php';
-require 'akpathfinding.php';
+require 'modules/myrpathfinding.inc.php';
 
 class akMyrmes extends Table
 {
-	function akMyrmes( )
+	function __construct( )
 	{
         	
  
@@ -45,7 +44,9 @@ class akMyrmes extends Table
             "active_worker_x"=>16,
             "active_worker_y"=>17,
             "active_worker_flag"=>18,
-            "active_worker_moves"=>19
+            "active_worker_moves"=>19,
+            "player_count"=>20,
+            "progress_indicator"=>21
             //    "my_first_global_variable" => 10,
             //    "my_second_global_variable" => 11,
             //      ...
@@ -75,26 +76,34 @@ class akMyrmes extends Table
         // The number of colors defined here must correspond to the maximum number of players allowed for the gams
         //Myrmes - red, yellow, blue, black
         $default_colors = array( "ff0000", "ffff00", "0000ff", "000000" );
+        $default_colors2 = array( "ff0000", "ffff00", "0000ff", "000000" );
  
         // Create players
         // Note: if you added some extra field on "player" table in the database (dbmodel.sql), you can initialize it there.
-        $nurseCountInitial = 3;
-        $workerCountInitial = 2;
-        $larvaeCountInitial = 1;
-        $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar, player_nurses, player_workers, player_larvae) VALUES ";
+        $sql = "INSERT INTO player (player_id, player_color, player_canal, player_name, player_avatar, player_nurses, player_workers, player_larvae, player_colony_level, player_food, player_dirt) VALUES ";
         $values = array();
         foreach( $players as $player_id => $player )
         {
             //each player starts with 3 nurses, 2 workers, 1 larvae
             //also soldiers 0, colony level 0, food 0, dirt 0, stone 0
             $color = array_shift( $default_colors );
-            $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."', '".$nurseCountInitial."', '".$workerCountInitial."', '".$larvaeCountInitial."')";
+            $values[] = "('".$player_id."','$color','".$player['player_canal']."','".addslashes( $player['player_name'] )."','".addslashes( $player['player_avatar'] )."', '".$this->initialNurseCount."', '".$this->initialWorkerCount."', '".$this->initialLarvaeCount."', '".$this->initialColonyLevel."', '".$this->initialFoodCount."', '".$this->initialDirtCount."')";
         }
         $sql .= implode( $values, ',' );
         self::DbQuery( $sql );
         self::reattributeColorsBasedOnPreferences( $players, array(  "ff0000", "ffff00", "0000ff", "000000" ) );
         self::reloadPlayersBasicInfos();
-        $playerData = self::getCollectionFromDb("select player_id, player_color from player");
+        
+        $sql = "update player set player_color_name = 'red' where player_color = '".$default_colors2[0]."'";
+        self::DbQuery($sql);
+        $sql = "update player set player_color_name = 'yellow' where player_color = '".$default_colors2[1]."'";
+        self::DbQuery($sql);
+        $sql = "update player set player_color_name = 'blue' where player_color = '".$default_colors2[2]."'";
+        self::DbQuery($sql);
+        $sql = "update player set player_color_name = 'black' where player_color = '".$default_colors2[3]."'";
+        self::DbQuery($sql);
+               
+        $playerData = self::getCollectionFromDb("select player_id, player_color from player");       
         
         //tiles
         //first, the ones each player has
@@ -140,6 +149,34 @@ class akMyrmes extends Table
             }
         }
         
+        //also the bugs (randomised)
+        //there are 18 bugs available, 6 of each type
+        //there are 18 possible spots for bugs in a 4p game, 11 in 2p, 12 in 3p
+        //place them all, then hide or remove?
+        $bugs = array();
+        foreach( $this->bugTileTypes as $type_id => $tile )
+        {
+            for ($i =0; $i< $tile["count"]; $i++)
+            {
+                $bugs[] = $type_id;                
+            }
+        }
+        shuffle($bugs);
+        
+        foreach($this->bugLocations as $bugLocation)
+        {
+            if (MyrmesHexGrid::IsPartOfBoard($bugLocation['x'], $bugLocation['y'], count($players)))
+            {
+                //get a random bug and add it to the board
+                $bug = array_pop($bugs); 
+                
+                $sql = "INSERT INTO tiles (player_id, type_id, x1, y1, location, color)";
+                $sql = $sql . " VALUES (0, ".$bug.", '".$bugLocation['x']."','".$bugLocation['y']."', 'board', '')";
+                self::DbQuery( $sql );
+            }
+        }
+        
+        
         //each player gets a tunnel at a random available starting location
         //$startPositions = array();
         
@@ -175,6 +212,7 @@ class akMyrmes extends Table
         //---------------
         //--YEAR/SEASON--
         //---------------
+        $this->setGameStateValue('player_count', count($players));
         $this->setGameStateValue('current_year', 1);
         $this->setGameStateValue('current_season', 1);       
         $this->setGameStateValue('active_worker_flag', 0);
@@ -216,18 +254,23 @@ class akMyrmes extends Table
         // Note: you can retrieve some extra field you added for "player" table in "dbmodel.sql" if you need it.
         $sql = "SELECT player_id id, player_color color, player_colony_level colony, player_score score, player_nurses nurses, player_larvae larvae, player_soldiers soldiers, player_workers workers, player_food food, player_stone stone, player_dirt dirt FROM player ";
         $result['players'] = self::getCollectionFromDb( $sql );
+        $result['maxWorkerCount'] = $this->maxWorkerCount;
+        $result['maxNurseCount'] = $this->maxNurseCount;
  
         //Gather all information about current game situation (visible by player $current_player_id).
         $result['current_year'] = $this->getGameStateValue("current_year");
         $result['current_season'] = $this->getGameStateValue("current_season");
-        
+		$result['spring_event'] = $this->getGameStateValue("spring_event");
+		$result['summer_event'] = $this->getGameStateValue("summer_event");
+		$result['fall_event'] = $this->getGameStateValue("fall_event");
+		                   
         //the hex info needs to be in a form more suitable for js
         $hexInfo = array();
         
         $sql = "SELECT tile_id, color, x1, y1 from tiles where location='board' and type_id='1'";
         $result['tunnels'] = self::getObjectListFromDB( $sql );
         
-        $sql = "SELECT tile_id, type_id, color, rotation, x1, y1 from tiles where location='board' and type_id > '1'";
+        $sql = "SELECT tile_id, player_id, subtype_id, type_id, color, flipped, rotation, x1, y1, res1, x2, y2, res2, x3, y3, res3, x4, y4, res4, x5, y5, res5, x6, y6, res6 from tiles where location='board' and type_id > '1'";
         $result['pheromones'] = self::getObjectListFromDB( $sql );
         
         if ($this->getGameStateValue("active_worker_flag")== 1)
@@ -235,16 +278,16 @@ class akMyrmes extends Table
             $result['activeWorker'] = array(
                 "x"=>$this->getGameStateValue("active_worker_x"),
                 "y"=>$this->getGameStateValue("active_worker_y"),
+                "color"=>$this->getPlayerVariable("player_color_name", self::getActivePlayerId()),
                 );
-        }
-            
-            
+        }       
+        
+        //return all the spare tile counts
+        $result['tileCounts'] = $this->getTileCounts();
+        $result['specialTileCounts'] = $this->getSpecialTileCounts();
+                            
         //TODO - return which birthing choices this player has made (if appropriate?)
                 
-        //$hexInfo['key'] = 'value';
-        
-        //$result['hex_info'] = $this->hexInfo;
-  
         return $result;
     }
 
@@ -261,8 +304,34 @@ class akMyrmes extends Table
     function getGameProgression()
     {
         // TODO: compute and return the game progression
-
-        return 0;
+        // 33% per completed year, plus 11% per completed season
+        $currentYear = $this->getGameStateValue("current_year");
+        $currentSeason = $this->getGameStateValue("current_season");
+        $progressIndicator = $this->getGameStateValue("progress_indicator");
+        $completion = 33*($currentYear-1);
+        if ($currentSeason <=3)
+        {
+            $completion += 11*($currentSeason-1);
+        }
+        
+        if ($progressIndicator >= 4) //storage phase is 10/11
+        {
+            $completion += 10;
+        }
+        else if ($progressIndicator >= 3) //atelier phase is 8/11
+        {
+            $completion += 8;
+        }
+        else if ($progressIndicator >= 2) //harvest phase is 7/11
+        {
+            $completion += 7;
+        }
+        else if ($progressIndicator >= 1) //worker phase is 2/11
+        {
+            $completion += 2;
+        }   
+        
+        return $completion;
     }
 
 
@@ -274,6 +343,64 @@ class akMyrmes extends Table
         In this space, you can put any utility methods useful for your game logic
     */
     
+    private function getTileCounts()
+    {
+        $sql = "select 0 as count, color, player_id, type_id from tiles group by player_id, type_id, color
+union
+SELECT count(tile_id) as count, color, player_id, type_id from tiles where location='storage' group by player_id, type_id, color";
+        return self::getObjectListFromDB( $sql );
+    }
+    
+    private function getSpecialTileCounts()
+    {
+        $sql = "select (".$this->maxSpecialTileCount."-0) as count, color, player_id from tiles group by player_id, type_id, color
+union
+SELECT (".$this->maxSpecialTileCount."-count(tile_id)) as count, color, player_id from tiles where location='board' and (type_id=9 or type_id=10) group by player_id, color";
+        return self::getObjectListFromDB( $sql ); 
+    }
+    
+    private function IsVPBonusActive($playerId)
+    {
+        $event = $this->getPlayerVariable("player_event_selected", $playerId);
+        return $event == $this->eventVP;
+    }
+    
+    private function colonyStorageExceeded($playerID)
+    {
+        $sql = "SELECT * FROM player where player_id='".$playerID."'";
+        $player = self::getObjectFromDb( $sql );
+        
+        $colonyLevel = $player["player_colony_level"];
+        $food = $player["player_food"];
+        $dirt = $player["player_dirt"];
+        $stone = $player["player_stone"];
+        $resources = $food + $dirt + $stone;
+            
+        if ($resources <=4)
+        {
+            return false;            
+        }
+        else if ($resources <=6 && $colonyLevel >=2)
+        {
+            return false;            
+        }
+        return true;        
+    }
+    
+    private function getTileByXY($x, $y)
+    {
+        $sql = "select player_id, type_id, tile_id, res1, res2, res3, res4, res5, res6 from tiles where ".
+                " (x1='".$x."' and y1='".$y."') OR ".
+                " (x2='".$x."' and y2='".$y."') OR ".
+                " (x3='".$x."' and y3='".$y."') OR ".
+                " (x4='".$x."' and y4='".$y."') OR ".
+                " (x5='".$x."' and y5='".$y."') OR ".
+                " (x6='".$x."' and y6='".$y."')";
+        $match = self::getCollectionFromDb($sql);
+        $match = reset($match);
+        return $match;
+    }
+    
     private function incPlayerVariable($varName, $playerId, $increment)
     {
         $value = $this->getPlayerVariable($varName, $playerId);
@@ -283,7 +410,7 @@ class akMyrmes extends Table
     
     private function getPlayerVariable($varName, $playerId)
     {
-        $sql = "SELECT 0, ".$varName." FROM player where player_id = '".$playerId."'";
+        $sql = "SELECT 0,".$varName." FROM player where player_id = '".$playerId."'";
         $player = self::getCollectionFromDb( $sql );
         return $player[0][$varName];
     }
@@ -292,14 +419,50 @@ class akMyrmes extends Table
     {
         $sql = "update player set ".$varName." = '".$newValue."' where player_id = '".$playerId."'";
         self::DbQuery( $sql );
+        
+        if ($varName == "player_score")
+        {
+            self::notifyAllPlayers( "setScore", '', array(
+                        'player_id' => $playerId,
+                        'score' => $newValue
+                    ));
+        }    
+        
+        if ($varName == "player_workers" || $varName == "player_soldiers")
+        {
+            $soldierCount = $this->getPlayerVariable("player_soldiers", $playerId);
+            $workerCount = $this->getPlayerVariable("player_workers", $playerId);
+            self::notifyAllPlayers( "setWorkers", '', array(
+                        'player_id' => $playerId,
+                        'workerCount' => $newValue,
+                        'workersRemaining' => $this->maxWorkerCount - (int)$workerCount - (int)$soldierCount
+                    ));
+        }    
+        if ($varName == "player_nurses")
+        {
+            $nurseCount = $this->getPlayerVariable("player_nurses", $playerId);
+            //todo - count objective ones
+            self::notifyAllPlayers( "setNurses", '', array(
+                        'player_id' => $playerId,
+                        'nurseCount' => $newValue,
+                        'nursesRemaining' => $this->maxNurseCount - (int)$nurseCount
+                    ));
+        }  
     }
     
-    private function playerSubtractScore($playerId, $loss)
+    private function removeAtelierAction($playerId)
     {
-        $sql = "update player set player_score = player_score - ".$loss." where player_id = '".$playerId."'";
-        self::DbQuery( $sql );
+        for ($i=1;$i<=4; $i++)
+        {
+            $atelier = $this->getPlayerVariable("player_atelier_".$i."_allocated", $playerId);
+            if ($atelier > 0)
+            {
+                $this->setPlayerVariable("player_atelier_".$i."_allocated", $playerId, 0);
+                return;
+            }
+        }
     }
-    
+        
     private function rollSeasons(){
         $this->setGameStateValue('spring_event', rand(1, 6));
         $this->setGameStateValue('summer_event', rand(1, 6));
@@ -327,6 +490,78 @@ class akMyrmes extends Table
             throw new feException("Invalid season " . $season);            
         }
         return $currentEvent;
+    }
+    
+    private function cleanupTempTiles()
+    {
+        //if this was a player tile type (2-8), reassign it. Otherwise, it's neutral
+        $sql = "select tile_id, type_id from tiles where location = 'board_temp'";
+        $tiles = self::GetCollectionFromDb($sql);
+        
+        foreach($tiles as $tile)
+        {
+            $owner = "0";
+            $color = "";
+            if ($tile["type_id"] < 9)
+            {
+                $owner = self::getActivePlayerId();
+                $color = $this->getPlayerVariable('player_color_name', self::getActivePlayerId());
+            }
+            $tileID = $tile["tile_id"];
+            $sql = "update tiles set color='".$color."', player_id='".$owner."', x1=0,x2=0,x3=0,x4=0,x5=0,x6=0,y1=0,y2=0,y3=0,y4=0,y5=0,y6=0, location = 'storage' where tile_id='".$tileID."'";
+            self::DbQuery($sql);
+        }   
+    }
+    
+    private function processPlacedTile($tileID)
+    {
+        $sql = "SELECT tile_id, player_id, subtype_id, type_id, color, flipped, rotation, x1, y1, res1, x2, y2, res2, x3, y3, res3, x4, y4, res4, x5, y5, res5, x6, y6, res6 from tiles where tile_id = '".$tileID."'";
+                    
+        $playerId = self::getActivePlayerId();
+        $placedTile = self::getObjectListFromDB( $sql );
+        $tileType = $placedTile[0]["type_id"];
+        $subType = $placedTile[0]["subtype_id"];
+                    
+        $points = 0;
+        if ($tileType <9 )
+        {
+            $points = $this->playerTileTypes[$tileType]["points"];
+        }   
+        else {
+            $points = $this->sharedTileTypes[$tileType]["points"];
+        }
+        
+        if ($points > 0 && $this->isVPBonusActive($playerId))
+        {
+            $points++;
+        }
+        
+        if ($tileType == 9 && $subType == "9a")
+        {
+            $this->incPlayerVariable("player_stone", $playerId, -1);
+        }
+        if ($tileType == 9 && $subType == "9b")
+        {
+            $this->incPlayerVariable("player_food", $playerId, -1);
+        }
+        if ($tileType == 1)
+        {
+            $this->incPlayerVariable("player_dirt", $playerId, 1);
+        }
+        
+        $this->incPlayerVariable("player_score", $playerId, $points);
+               
+        self::notifyAllPlayers( "tilePlaced", clienttranslate( '${player_name} places a tile (${points} points)' ), array(
+            'player_id' => $playerId,
+            'player_name' => self::getActivePlayerName(),
+            'tile' => $placedTile[0],
+            'points'=> $points,
+            'dirtCount'=> $this->getPlayerVariable('player_dirt', $playerId),
+            'foodCount'=> $this->getPlayerVariable('player_food', $playerId),
+            'stoneCount'=> $this->getPlayerVariable('player_stone', $playerId),
+            'tileCounts'=>$this->getTileCounts(),
+            'specialTileCounts'=>$this->getSpecialTileCounts()
+        ));                   
     }
     
     private function getAvailableNurses($playerID)
@@ -383,6 +618,55 @@ class akMyrmes extends Table
             $this->activeNextPlayer();
             $activePlayerID = self::getActivePlayerId();
         }
+    }
+    
+    private function getPlayerHarvestAllocations($playerID) {
+        
+        $private = array();
+        $private['allocated'] = array();
+        $private['can_allocate'] = array();
+        $private['can_deallocate'] = array();
+        
+        $sql = "SELECT * FROM tiles where player_id = '".$playerID."' and location='board'";
+        $playerTiles = self::getCollectionFromDB( $sql );
+        
+        //tiles have a 'harvest_selected' int column
+        //binary - 1,2,4,8,16,32 for the 6 resource spots
+        //therefore >0 means something selected
+        //normally only one per tile, but we may have the 3 extra cubes in harvest selected
+                               
+        $selectedEvent = $this->getPlayerVariable('player_event_selected', $playerID);
+        $extraAllocations = 0;
+        if ($selectedEvent == $this->eventHarvest)
+        {
+            $extraAllocations = 3;
+        }
+              
+        foreach($playerTiles as $tile)
+        {
+            $tileID = $tile['tile_id'];
+            $myrmesTile = new Tile($tile, $this->playerTileTypes, $this->sharedTileTypes);
+            
+            $hexesWithResources = array();
+            $harvestHexes = $myrmesTile->getHarvestHexes();
+            $category = $myrmesTile->getTileCategory();
+                        
+            if ($category == "pheromone" || $category == "special")
+            {
+                if (count($harvestHexes) == 0) //none selected, add all of them
+                {
+                    for($i=0; $i< $myrmesTile->Size; $i++)
+                    {
+                        if ($myrmesTile->hasResourceOnHex($i+1))
+                        {
+                            array_push($private['can_allocate'], $myrmesTile->getHexID($i+1));
+                        }
+                    }                     
+                }
+            }
+        }        
+        
+        return $private;
     }
     
     private function getPlayerAllocations($playerID) {
@@ -548,6 +832,107 @@ class akMyrmes extends Table
     }
     
 
+    private function getBoardResource($x, $y)
+    {
+        if ($x == 0 && $y == 0)
+            return "";
+        
+        $board1 = $this->boardSpaces[$x][$y];
+        if ($board1 == "GRASS")
+        {
+            return "FOOD";
+        }
+        if ($board1 == "DIRT")
+        {
+            return "DIRT";
+        }
+        if ($board1 == "STONE")
+        {
+            return "STONE";
+        }
+        return "";
+    }
+    
+    private function saveTileToBoard($tiles, $tileType, $rotation, $isFlipped, $originHex, $isTemp)
+    {                      
+        //first, get the ID of the tile we are adding to the board
+        $sql = "select tile_id, type_id from tiles where type_id='".$tileType."' and location='storage' and (player_id='".self::getActivePlayerId()."' or player_id='0') limit 1";
+        $tile = self::getObjectFromDb( $sql );
+        $tileID = $tile["tile_id"];
+        $typeID = $tile["type_id"];
+        
+        $x = self::getGameStateValue("active_worker_x");        
+        $y = self::getGameStateValue("active_worker_y");        
+        
+        $x1 = $y1 = $x2 = $y2 = $x3 = $y3 = $x4 = $y4 = $x5 = $y5 = $x6 = $y6 = 0;
+        
+        if (count($tiles) > 0)
+        {
+            $tile = $tiles[0];
+            $x1 = $tile["x"] + $x;
+            $y1 = $tile["y"] + $y;
+        }
+        
+        if (count($tiles) > 1)
+        {
+            $tile = $tiles[1];
+            $x2 = $tile["x"] + $x;
+            $y2 = $tile["y"] + $y;
+        }
+        
+        if (count($tiles) > 2)
+        {
+            $tile = $tiles[2];
+            $x3 = $tile["x"] + $x;
+            $y3 = $tile["y"] + $y;
+        }
+        
+        if (count($tiles) > 3)
+        {
+            $tile = $tiles[3];
+            $x4 = $tile["x"] + $x;
+            $y4 = $tile["y"] + $y;
+        }
+        
+        if (count($tiles) > 4)
+        {
+            $tile = $tiles[4];
+            $x5 = $tile["x"] + $x;
+            $y5 = $tile["y"] + $y;
+        }
+        
+        if (count($tiles) > 5)
+        {
+            $tile = $tiles[5];
+            $x6 = $tile["x"] + $x;
+            $y6 = $tile["y"] + $y;
+        }
+        
+        if ($typeID > 1 && $typeID < 9)
+        {
+            $res1 = $this->getBoardResource($x1, $y1);
+            $res2 = $this->getBoardResource($x2, $y2);  
+            $res3 = $this->getBoardResource($x3, $y3);
+            $res4 = $this->getBoardResource($x4, $y4);
+            $res5 = $this->getBoardResource($x5, $y5);
+            $res6 = $this->getBoardResource($x6, $y6); 
+        }
+        else
+        {
+            $res1 = $res2 = $res3 = $res4 = $res5 = $res6 = "";            
+        }
+        
+        $playerColor = $this->getPlayerVariable('player_color_name', self::getActivePlayerId());
+        $location = "board";
+        if ($isTemp)
+        {
+            $location = "board_temp";
+        }
+        
+        $sql = "update tiles set color='".$playerColor."', location='".$location."', flipped='".$isFlipped."', rotation='".$rotation."', player_id = '".self::getActivePlayerId()."', x1='".$x1."', y1='".$y1."' , x2='".$x2."', y2='".$y2."' , x3='".$x3."', y3='".$y3."' , x4='".$x4."', y4='".$y4."' , x5='".$x5."', y5='".$y5."', x6='".$x6."', y6='".$y6."', res1='".$res1."', res2='".$res2."', res3='".$res3."', res4='".$res4."', res5='".$res5."', res6='".$res6."' where tile_id = '".$tileID."'";
+        self::DbQuery( $sql );
+        return $tileID;
+    }
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -558,76 +943,159 @@ class akMyrmes extends Table
         Each time a player is doing some game action, one of the methods below is called.
         (note: each method below must match an input method in akmyrmes.action.php)
     */
-    
-    function saveTileToBoard($splitHexes, $tileType, $rotation, $isFlipped)
-    {
-        //first, get the ID of the tile we are adding to the board
-        $sql = "select tile_id from tiles where type_id='".$tileType."' and location='storage' and player_id='".self::getActivePlayerId()."' or player_id='0' limit 1";
-        $tile = self::getObjectFromDb( $sql );
-        $tileID = $tile["tile_id"];
-                
-        $x1 = $y1 = $x2 = $y2 = $x3 = $y3 = $x4 = $y4 = $x5 = $y5 = 0;
-        $xy1 = explode("_", $splitHexes[0]);
-        $x1 = $xy1[0];
-        $y1 = $xy1[1];
-                    
-        if (count($splitHexes) > 1)
-        {
-            $xy2 = explode("_", $splitHexes[1]);
-            $x2 = $xy2[0];
-            $y2 = $xy2[1];
-        }
-                    
-        if (count($splitHexes) > 2)
-        {
-            $xy3 = explode("_", $splitHexes[2]);
-            $x3 = $xy3[0];
-            $y3 = $xy3[1];
-        }
-                    
-        if (count($splitHexes) > 3)
-        {
-            $xy4 = explode("_", $splitHexes[3]);
-            $x4 = $xy4[0];
-            $y4 = $xy4[1];
-        }
-                    
-        if (count($splitHexes) > 4)
-        {
-            $xy5 = explode("_", $splitHexes[4]);
-            $x5 = $xy5[0];
-            $y5 = $xy5[1];
-        }
         
-        //5, 0, 1 work as is. 2,3,4 will not since they will use a different origin
-        //in this case, subtract 3.
-        $newRot = $rotation;
-        if ($rotation = 2 || $rotation == 3 || $rotation == 4)
-        {
-            $newRot = $newRot - 3;
-        }
-                            
-        $sql = "update tiles set location='board', rotation='".$newRot."', player_id = '".self::getActivePlayerId()."', x1='".$x1."', y1='".$y1."' , x2='".$x2."', y2='".$y2."' , x3='".$x3."', y3='".$y3."' , x4='".$x4."', y4='".$y4."' , x5='".$x5."', y5='".$y5."' where tile_id = '".$tileID."'";
-        self::DbQuery( $sql );
-    }
-    
     function onStartPlaceTile()
     {
         //user clicked the button to place a tile
+        self::checkAction( 'placeTile' );
         $this->gamestate->nextstate("chooseTile");
     }
     
     function onCancelTile()
     {
-        //user clicked the button to place a tile
+        self::checkAction( 'cancel' );
+        
+        $this->cleanupTempTiles();           
+        
         $this->gamestate->nextstate("cancel");
+    }
+    
+    function onDiscardWorker()
+    {        
+        self::checkAction( 'discardWorker' );
+        self::notifyAllPlayers( "discardWorker", clienttranslate( '${player_name} discards a worker' ), array(
+                        'player_name' => self::getActivePlayerName()                
+                    ));
+        $this->gamestate->nextstate("workerUsed");
+    }
+    
+    function onConvertLarvae()
+    {        
+        self::checkAction( 'convertLarvae' );
+        $playerId = self::getCurrentPlayerid();
+        $food = $this->getPlayerVariable("player_food", $playerId);
+        $larvae = $this->getPlayerVariable("player_larvae", $playerId);
+        
+        if ($larvae < 3)
+        {
+            throw new feException("Invalid conversion, not enough larvae");
+        }
+        
+        $food++;
+        $larvae-=3;
+        
+        $this->setPlayerVariable("player_food", $playerId, $food);
+        $this->setPlayerVariable("player_larvae", $playerId, $larvae);
+        
+        self::notifyAllPlayers( "larvaeConverted", clienttranslate( '${player_name} converts 3 Larvae into 1 Food' ), array(
+            'player_name' => self::getCurrentPlayerName(),
+            'player_id' => $playerId,
+            'foodCount' => $food,
+            'larvaeCount' => $larvae
+        ));
+        
+        //if we are in winter, re-run the food check.
+        $currentState = $this->getGameStateValue("state");
+        if ($currentState == 51)
+        {
+            $this->stWinterFoodCheck();
+            return;
+        }
+        
+        $this->gamestate->nextstate("larvae");
+    }
+    
+    //todo - check action on ALL actions and JS side too
+    function onClearPheromone(){
+    
+        self::checkAction( 'clearPheromone' );
+        
+        $validMoves = $this->argMoveWorker();
+        
+        if (!$validMoves["canClearPheromone"])
+        {
+            throw new feException("Invalid clear pheromone action ");
+        }
+               
+        //give active player X vp IF it is an opponent's tile
+        $pointsValue = 0;
+        
+        $x = $this->getGameStateValue("active_worker_x");
+        $y = $this->getGameStateValue("active_worker_y");
+        $match = $this->getTileByXY($x,$y);
+
+        if ($match["player_id"] != self::getActivePlayerId())
+        {
+            $type_id = $match["type_id"];
+            $pointsValue = $this->playerTileTypes[$type_id]["points"];
+            if ($pointsValue > 0 && $this->isVPBonusActive(self::getActivePlayerId()))
+            {
+                $pointsValue++;
+            }
+            $this->incPlayerVariable('player_score', self::getActivePlayerId(), $pointsValue);
+        }
+        
+        //remove tile from board
+        $sql = "update tiles set location='discard' where tile_id='".$match["tile_id"]."'";
+        
+        self::DbQuery($sql);
+        
+        //remove 1 dirt from active player
+        $this->incPlayerVariable('player_dirt', self::getActivePlayerId(), -1);
+        
+        //must notify players
+        if ($pointsValue > 0)
+        {
+            self::notifyAllPlayers( "pheromoneCleared", clienttranslate( '${player_name} pays 1 dirt to clear a pheromone tile, and scores ${points} points)' ), array(
+                'player_id' => self::getActivePlayerId(),
+                'player_name' => self::getActivePlayerName(),
+                'tile_id' => $match["tile_id"],
+                'points'=> $pointsValue,
+                'dirtCount'=> $this->getPlayerVariable('player_dirt', self::getActivePlayerId())
+            ));
+        }
+        else
+        {
+            self::notifyAllPlayers( "pheromoneCleared", clienttranslate( '${player_name} pays 1 dirt to clear a pheromone tile' ), array(
+                'player_id' => self::getActivePlayerId(),
+                'player_name' => self::getActivePlayerName(),
+                'tile_id' => $match["tile_id"],
+                'dirtCount'=> $this->getPlayerVariable('player_dirt', self::getActivePlayerId())
+            ));         
+        }
+        
+        $this->gamestate->nextstate("workerUsed");
+    }
+    
+    function onMultiTileChosen($type_id)
+    {
+        self::checkAction( 'selectTile' );
+                
+        //save this tile to board. Move all others back to storage.
+        //update scores etc. Use common function for this
+        $sql = "select tile_id from tiles where location = 'board_temp' and type_id='".$type_id."'";
+        $tile_id = self::getUniqueValueFromDb($sql);
+        
+        $sql = "update tiles set location='board' where tile_id='".$tile_id."'";
+        self::DbQuery($sql);
+        
+        //handle special case for 9a/9b
+        if ($type_id == "9a"|| $type_id == "9b")
+        {
+            $sql = "update tiles set subtype_id='".$type_id."' where tile_id='".$tile_id."'";
+            self::DbQuery($sql);            
+        }
+        
+        $this->processPlacedTile($tile_id);
+        $this->cleanupTempTiles();  
+        
+        $this->gamestate->nextstate("tilePlaced");       
     }
     
     //X_YxX_YxX_Y etc - can't use comma to separate as invalid arg type
     function onConfirmTile($hexes)
     {
-        //var_dump($hexes);
-        //die('ok');
+        self::checkAction( 'confirmTile' );
         
         //remap hexes into vector array based on starting point.
         //get all valid tile placements and check each type against it
@@ -668,65 +1136,83 @@ class akMyrmes extends Table
                
         //VALIDATION - check if the player has the required level for this size
         $colonyLevel = $this->getPlayerVariable("player_colony_level", self::getActivePlayerId());
-
+        //if they have the level+1 or hex+1 event, these are accounted for here
+        $chosenEvent = $this->getPlayerVariable('player_event_selected', self::getActivePlayerId());            
+        if ($chosenEvent == $this->eventLevel || $chosenEvent == $this->eventHex)
+        {
+            $colonyLevel++;
+        }
                 
         //get the actual valid vectors, and somehow match them.
         //this is an array of arrays. Each array is a list of hexes that might match
         //those supplied. Find out!
         $tilePlacements = $this->getTilePlacements(false);
+                        
         $errMsg = "";
+        $matches = array();
+        $matchedTypes = array();
                 
         //strings can be more easily sorted, so we can compare vectors
         foreach($tilePlacements as $tilePlacement)
         {
+            //no point adding more than one orientation of the same tile as a match
+            if (in_array($tilePlacement->Type, $matchedTypes))
+            {
+                continue;
+            }
+            
             $targetVectors = array();
             foreach($tilePlacement->Tiles as $hex)
             {
                 $targetVectors[] = $hex["x"]."_".$hex["y"];
             }
             sort($targetVectors);
-            //var_dump("checking");
-            //var_dump($targetVectors);
             
             if (count($vectors) == count($targetVectors))
             {
                 if (count(array_diff($vectors, $targetVectors)) == 0 && count(array_diff($targetVectors, $vectors)) == 0 )
-                {
-                    //var_dump("MATCH!!");
-                    //var_dump("type: ".$tilePlacement->Type);
-                    //var_dump("rotation: ".$tilePlacement->Rotation);
-                    //var_dump("isFlipped: ".$tilePlacement->IsFlipped);
-                    //var_dump("vectors: ");
-                    //var_dump($vectors);
+                {                   
+                    if ($tilePlacement->Type <= 8)
+                    {
+                        $requiredLevel = $this->playerTileTypes[$tilePlacement->Type]["levelRequired"];
+                    }
+                    else
+                    {
+                        $requiredLevel = $this->sharedTileTypes[$tilePlacement->Type]["levelRequired"];                        
+                    }
                     
-                    $requiredLevel = $this->playerTileTypes[$tilePlacement->Type]["levelRequired"];
                     
-                    //validate colony level
+                    //validate colony level and/or resource requirements
                     if ($requiredLevel > $colonyLevel)
                     {
-                        $errMsg = clienttranslate('Colony level too low');
+                        $errMsg = clienttranslate('Colony level too low');                        
                         continue;
+                    }
+                    
+                    //if it's 9,require EITHER food or stone
+                    if ($tilePlacement->Type == 9)
+                    {
+                        $foodCount = $this->getPlayerVariable('player_food', self::getActivePlayerId());
+                        $stoneCount = $this->getPlayerVariable('player_stone', self::getActivePlayerId());
+                        if ($foodCount + $stoneCount == 0)
+                        {
+                            $errMsg = clienttranslate('Insufficient resources to build an Aphid farm or Scavenging tile');                            
+                            continue;
+                        }
                     }
                     
                     //validate any tiles remaining, message if ran out of matches
-                    $sql = "select distinct type_id from tiles where type_id='".$tilePlacement->Type."' and location = 'storage' and player_id = '".self::getActivePlayerId()."'";
+                    $sql = "select distinct type_id from tiles where type_id='".$tilePlacement->Type."' and location = 'storage' and (player_id = '".self::getActivePlayerId()."' OR player_id='')";
                     $pheromoneTypes = self::getCollectionFromDb($sql);
                     if (count($pheromoneTypes) == 0)
                     {
-                        $errMsg = clienttranslate('No matching tiles remaining');
+                        $errMsg = clienttranslate('No matching tiles remaining');                        
                         continue;
                     }
-                                        
-                    //so, we got a match. We need to know what type of tile this was
-                    //and figure out how we will draw it on the board                   
                     
-                    //todo - save to db and process to next state
-                    //var_dump("type: ".$tilePlacement->Type);
-                    //var_dump("rotation: ".$tilePlacement->Rotation);
-                    //var_dump("isFlipped: ".$tilePlacement->IsFlipped);
-                    $this->saveTileToBoard($splitHexes, $tilePlacement->Type, $tilePlacement->Rotation, $tilePlacement->IsFlipped);                   
-                    $this->gamestate->nextstate("tilePlaced");
-                    return;
+                    $matchedTypes[] = $tilePlacement->Type;
+                    $matches[] = $tilePlacement;
+                    continue;
                 }
                 else
                 {
@@ -737,6 +1223,44 @@ class akMyrmes extends Table
             {
                 //wrong size, ignore
             }
+        }
+        
+        //var_dump($matchedTypes);
+        //var_dump($matches);
+        //die('ok');
+                
+        //if we only got one match, process it. Otherwise the user needs to pick one
+        //and we need to not forget the spaces chosen or tiles available!
+        
+        //IMPORTANT! type 9 is a double sided tile, so offer two choices
+        //if this is present too (with BOTH resources)
+        $foodCount = $this->getPlayerVariable('player_food', self::getActivePlayerId());
+        $stoneCount = $this->getPlayerVariable('player_stone', self::getActivePlayerId());
+        
+        if (count($matches) >1 || ((count($matches) == 1) && $matches[0]->Type == 9 && $foodCount > 0 && $stoneCount > 0))
+        {
+            //save all matches to 'temporary' board state so we don't lose them
+            foreach($matches as $tilePlacement)
+            {
+                $this->saveTileToBoard($tilePlacement->Tiles, $tilePlacement->Type, $tilePlacement->Rotation, $tilePlacement->IsFlipped, $tilePlacement->OriginHex, true);
+            }
+            $this->gamestate->nextstate("multiTileChoice");
+            return;
+        }
+        else if (count($matches) == 1)
+        {
+            //so, we got a match. We need to know what type of tile this was
+            //and figure out how we will draw it on the board                   
+                    
+            //save to db and process to next state
+            foreach($matches as $tilePlacement)
+            {
+                $tileID = $this->saveTileToBoard($tilePlacement->Tiles, $tilePlacement->Type, $tilePlacement->Rotation, $tilePlacement->IsFlipped, $tilePlacement->OriginHex, false);
+            }
+            $this->processPlacedTile($tileID);            
+                    
+            $this->gamestate->nextstate("tilePlaced");
+            return;            
         }
         
         if ($errMsg == "")
@@ -754,16 +1278,134 @@ class akMyrmes extends Table
         );
     }
     
+    function onAtelierClicked($action)
+    {
+        self::checkAction( 'selectHex' );
+        
+        $playerId = self::getActivePlayerId();
+        
+        //TODO check valid
+        $validMoves = $this->argAtelier();
+        
+        if (!in_array($action, $validMoves["atelierActions"]))
+        {
+            throw new feException("Invalid atelier action ".$action);
+        }
+        
+        //handle actions
+        if ($action == "nurse")
+        {
+            $this->incPlayerVariable("player_food", $playerId, -2);
+            $this->incPlayerVariable("player_larvae", $playerId, -2);
+            $this->incPlayerVariable("player_nurses", $playerId, 1);
+            
+            self::notifyAllPlayers( "atelierNurseGained", clienttranslate( '${player_name} gains a nurse' ), array(
+                'player_id' => $playerId,
+                'player_name' => self::getActivePlayerName(),
+                'foodCount' => $this->getPlayerVariable('player_food', $playerId),
+                'larvaeCount' => $this->getPlayerVariable('player_larvae', $playerId),
+                'nurseCount' => $this->getPlayerVariable('player_nurses', $playerId),
+            ));
+            
+            //mark this atelier action as used
+            $this->incPlayerVariable('player_atelier_used', $this->getActivePlayerId(), 1);
+            
+            //remove one atelier alloction
+            $this->removeAtelierAction($this->getActivePlayerId());
+            
+            //manage next state            
+            $this->gamestate->nextstate("nurse");    
+            return;
+        }
+        else if($action == "level")
+        {
+            $colonyLevel = $this->getPlayerVariable("player_colony_level", $playerId);
+            if ($colonyLevel == 0)
+            {
+                $this->incPlayerVariable("player_dirt", $playerId, -2);
+            }
+            if ($colonyLevel == 1)
+            {
+                $this->incPlayerVariable("player_dirt", $playerId, -2);
+                $this->incPlayerVariable("player_stone", $playerId, -1);
+            }
+            if ($colonyLevel == 2)
+            {
+                $this->incPlayerVariable("player_stone", $playerId, -3);
+            }
+            $this->incPlayerVariable("player_colony_level", $playerId, 1);
+            
+            self::notifyAllPlayers( "atelierLevelGained", clienttranslate( '${player_name} gains a colony level' ), array(
+                'player_id' => $playerId,
+                'player_name' => self::getActivePlayerName(),
+                'dirtCount' => $this->getPlayerVariable('player_dirt', $playerId),
+                'stoneCount' => $this->getPlayerVariable('player_stone', $playerId),
+                'colonyLevel' => $this->getPlayerVariable('player_colony_level', $playerId),
+            ));
+            
+            //mark this atelier action as used
+            $this->incPlayerVariable('player_atelier_used', $this->getActivePlayerId(), 2);
+            
+            //remove one atelier alloction
+            $this->removeAtelierAction($this->getActivePlayerId());
+            
+            //manage next state            
+            $this->gamestate->nextstate("level");    
+            return;
+        }
+        else if ($action == "tunnel")
+        {
+            //TODO
+            
+            //$this->incPlayerVariable('player_atelier_used', $this->getActivePlayerId(), 4);
+            //$this->removeAtelierAction($this->getActivePlayerId());
+            $this->gamestate->nextstate("tunnel");
+            return;
+        }
+        
+        throw new feException("atelier action ".$action." not implemented");
+    }
+    
     function onHexClicked($x, $y)
     {
+        self::checkAction( 'selectHex' );
+        
         //check valid
-        $hex = "hex_".$x."_".$y;
+        $hex = $x."_".$y;
         
         $currentState = $this->getGameStateValue("state");
         
-        if ($currentState != "10" && $currentState != "12")
+        if ($currentState != "10" && $currentState != "12" && $currentState != "37")
         {
             throw new feException("Unexpected hex click state ".$currentState);
+        }
+        
+        //place tunnel state. Validate & add the new tunnel
+        if ($currentState == "37")
+        {
+            $args = $this->argPlaceTunnel();
+            if (!in_array($hex, $args["validTunnelSpaces"]))
+            {
+                throw new feException("Invalid tunnel choice ".$hex);
+            }
+            
+            //place a tunnel!
+            //Move it from player store to board
+            //notify player
+            $tiles = array();
+            $tile = array("x"=>$x, "y"=>$y);
+            $tiles[] = $tile;
+            $tileID = $this->saveTileToBoard($tiles, 1, 0, 0, "", false);
+            $this->processPlacedTile($tileID);           
+            
+            //mark this atelier action as used
+            $this->incPlayerVariable('player_atelier_used', $this->getActivePlayerId(), 4);
+            
+            //remove one atelier alloction
+            $this->removeAtelierAction($this->getActivePlayerId());
+            
+            $this->gamestate->nextstate("tilePlaced");
+            return;
         }
         
         //place worker state. Must have chosen a tunnel
@@ -779,22 +1421,31 @@ class akMyrmes extends Table
             $this->setGameStateValue("active_worker_flag", 1);
             $this->setGameStateValue("active_worker_x", $x);
             $this->setGameStateValue("active_worker_y", $y);
-            $this->setGameStateValue('active_worker_moves', 3);//todo handle extra move event
             
-            //TODO - place a worker on the board (move it from player's board if possible)
-            //TODO - make sure that reloading immediately after this state adds the worker
-            //to the board
+            $movePoints = $this->defaultMovePoints;
+            $chosenEvent = $this->getPlayerVariable('player_event_selected', self::getActivePlayerId());            
+            if ($chosenEvent == $this->eventMove)
+            {
+                $movePoints +=3;
+            }
+            
+            $this->setGameStateValue('active_worker_moves', $movePoints);
+            
+            
+            // place a worker on the board (move it from player's board if possible)
             self::notifyAllPlayers( "workerPlaced", clienttranslate( '${player_name} places a worker on a colony entrance' ), array(
                 'player_id' => self::getActivePlayerId(),
                 'player_name' => self::getActivePlayerName(),
                 'x' => $x,
                 'y' => $y,
+                'color'=>$this->getPlayerVariable('player_color_name', self::getActivePlayerId())
                 ));
             
             $this->gamestate->nextstate("workerPlaced");
             return;
         }
         
+        //move worker
         if ($currentState == "12")
         {
             $args = $this->argMoveWorker();
@@ -803,20 +1454,125 @@ class akMyrmes extends Table
                 throw new feException("Invalid hex choice ".$hex);
             }
             
+            $oldX = $this->getGameStateValue("active_worker_x");
+            $oldY = $this->getGameStateValue("active_worker_y");
+            $oldTile = $this->getTileByXY($oldX, $oldY);
+            $newTile = $this->getTileByXY($x, $y);
+            if ($oldTile != false && $newTile != false && $oldTile["tile_id"] == $newTile["tile_id"])
+            {
+                //same tile, don't decrease move
+            }
+            else
+            {
+                $moves = $this->getGameStateValue('active_worker_moves');
+                $moves--;
+                $this->setGameStateValue('active_worker_moves', $moves);
+            }
+            
             //okay! mark this hex has having an active worker of this colour. (how?)
             $this->setGameStateValue("active_worker_flag", 1);
             $this->setGameStateValue("active_worker_x", $x);
-            $this->setGameStateValue("active_worker_y", $y);
+            $this->setGameStateValue("active_worker_y", $y);                   
             
-            //TODO - place a worker on the board (move it from player's board if possible)
-            //TODO - make sure that reloading immediately after this state adds the worker
-            //to the board
+            //place a worker on the board (move it from player's board if possible)
             self::notifyAllPlayers( "workerMoved", clienttranslate( '${player_name} moves a worker' ), array(
                 'player_id' => self::getActivePlayerId(),
                 'player_name' => self::getActivePlayerName(),
                 'x' => $x,
                 'y' => $y,
                 ));
+            
+            //if this hex blongs to an opponent (and ISN'T the same tile as before), lose a soldier
+            if ($newTile != false && 
+                    $oldTile["tile_id"] != $newTile["tile_id"] && 
+                    $newTile['player_id'] > 0 && 
+                    $newTile['player_id'] != self::getActivePlayerId())
+            {
+                //throw new feException("Handle tresspassing here");
+                $soldierCount = $this->getPlayerVariable("player_soldiers", self::getActivePlayerId());
+                if ($soldierCount == 0)
+                {
+                    throw new feException("Invalid move, no soldiers");
+                }
+                $this->incPlayerVariable("player_soldiers", self::getActivePlayerId(), -1);
+                $soldierCount = $this->getPlayerVariable("player_soldiers", self::getActivePlayerId());
+                self::notifyAllPlayers( "soldierLost", clienttranslate( '${player_name} entered an opposing hex and loses a soldier' ), array(
+                    'player_id' => self::getActivePlayerId(),
+                    'player_name' => self::getActivePlayerName(),                    
+                    'soldiers' => $soldierCount
+                ));
+            }
+            
+            //if this hex contains a bug, eat it
+            if ($newTile['type_id'] > 10)
+            {
+                $soldierCost = 1;
+                if ($newTile['type_id'] == 11)
+                {
+                    $foodGain = 2;
+                    $scoreGain = 0;
+                }
+                if ($newTile['type_id'] == 12)
+                {
+                    $foodGain = 1;
+                    $scoreGain = 2;
+                }
+                if ($newTile['type_id'] == 13)
+                {
+                    $soldierCost = 2;
+                    $foodGain = 1;
+                    $scoreGain = 4;
+                }
+                
+                $soldierCount = $this->getPlayerVariable("player_soldiers", self::getActivePlayerId());
+                if ($soldierCount < $soldierCost)
+                {
+                    throw new feException("Invalid move, not enough soldiers");
+                }
+                
+                $this->incPlayerVariable("player_soldiers", self::getActivePlayerId(), -$soldierCount);
+                $soldierCount = $this->getPlayerVariable("player_soldiers", self::getActivePlayerId());
+                
+                //TODO - move the bug tile to the player board, give food etc              
+                $bugResName = $this->bugTileTypes[$newTile['type_id']]["resourceName"];
+                
+                self::notifyAllPlayers( "soldierLost", clienttranslate( '${player_name} captured a ${bugname} and lost ${soldierCost} soldier(s)' ), array(
+                    'player_id' => self::getActivePlayerId(),
+                    'player_name' => self::getActivePlayerName(),                    
+                    'soldiers' => $soldierCount,
+                    'soldierCost' => $soldierCost,
+                    'bugname' => $this->resourceNames[$bugResName]
+                ));
+                
+                if ($scoreGain > 0 && $this->isVPBonusActive(self::getActivePlayerId()))
+                {
+                    $scoreGain++;
+                }
+                $this->incPlayerVariable("player_food", self::getActivePlayerId(), $foodGain);
+                $this->incPlayerVariable("player_score", self::getActivePlayerId(), $scoreGain);
+                
+                if ($scoreGain == 0)
+                {
+                    self::notifyAllPlayers( "bugEaten", clienttranslate( '${player_name} gains ${foodGain} food' ), array(
+                        'player_id' => self::getActivePlayerId(),
+                        'player_name' => self::getActivePlayerName(),                    
+                        'foodGain' => $foodGain,                    
+                        'foodCount' => $this->getPlayerVariable('player_food', self::getActivePlayerId()),
+                        'bugTileID' => $newTile["tile_id"]
+                    ));
+                }
+                else {
+                    self::notifyAllPlayers( "bugEaten", clienttranslate( '${player_name} gains ${foodGain} food and ${scoreGain} points' ), array(
+                        'player_id' => self::getActivePlayerId(),
+                        'player_name' => self::getActivePlayerName(),                    
+                        'foodGain' => $foodGain,                    
+                        'scoreGain' => $scoreGain,                    
+                        'foodCount' => $this->getPlayerVariable('player_food', self::getActivePlayerId()),
+                        'bugTileID' => $newTile["tile_id"]
+                    ));
+                }               
+            }
+            
             
             $this->gamestate->nextstate("workerMoved");
             return;
@@ -831,6 +1587,8 @@ class akMyrmes extends Table
         //give appropriate bonus (notify other players)
         //move to next worker
         
+        self::checkAction( 'activateColony' );
+        
         //check valid
         $validMoves = $this->argPlaceWorker();
         $colonyStr = "colony_".$slot;
@@ -842,7 +1600,7 @@ class akMyrmes extends Table
         
         //mark used
         $colonyUsed = $this->getPlayerVariable("player_colony_used", self::getActivePlayerId());
-        $colonyUsed += 2*($slot)+1;
+        $colonyUsed += pow(2, $slot);
         $this->setPlayerVariable("player_colony_used", self::getActivePlayerId(), $colonyUsed);
         
         //give bonus + notify
@@ -873,7 +1631,14 @@ class akMyrmes extends Table
                 $resname = $this->resourceNames["vp"];
                 //todo - validate food and different notification maybe?
                 $this->incPlayerVariable("player_food", self::getActivePlayerId(), -1);
-                $this->incPlayerVariable("player_score", self::getActivePlayerId(), 2);
+                
+                $points = 2;
+                if ($points > 0 && $this->isVPBonusActive(self::getActivePlayerId()))
+                {
+                    $points++;
+                }
+                
+                $this->incPlayerVariable("player_score", self::getActivePlayerId(), $points);
                 break;
             default:
                 throw new feException("Invalid colony slot ". $slot);
@@ -884,7 +1649,11 @@ class akMyrmes extends Table
             'player_name' => self::getActivePlayerName(),
             'slot' => $slot,
             'num' => $rescount,
-            'resname' => $resname
+            'resname' => $resname,
+            'larvaeCount' => $this->getPlayerVariable("player_larvae", self::getActivePlayerId()),
+            'foodCount' => $this->getPlayerVariable("player_food", self::getActivePlayerId()),
+            'stoneCount' => $this->getPlayerVariable("player_stone", self::getActivePlayerId()),
+            'dirtCount' => $this->getPlayerVariable("player_dirt", self::getActivePlayerId())
         ) );
         
         //next worker
@@ -892,6 +1661,8 @@ class akMyrmes extends Table
     }
     
     function allocateNurse($type, $slot){
+        
+        self::checkAction( 'allocateNurse' );
         
         $currentPlayerID = self::getCurrentPlayerId();
                 
@@ -981,20 +1752,168 @@ class akMyrmes extends Table
         );        
     }
     
-    function harvestChosen(){
+    function onHarvestChosen($hexes){
+        
+        self::checkAction( 'chooseHarvest' );
+        
         $currentPlayerID = self::getCurrentPlayerId();
+        
+        //validate!
+        //at least one resource selected from every tile
+        //no more than one resource selected from any tile
+        //if harvest event chosen, allow 3 extra
+        
+        $sql = "SELECT * FROM tiles where player_id = '".$currentPlayerID."' and location='board'";
+        $playerTiles = self::getCollectionFromDB( $sql );
+        
+        $selectedEvent = $this->getPlayerVariable('player_event_selected', $currentPlayerID);
+        $extraAllocations = 0;
+        if ($selectedEvent == $this->eventHarvest)
+        {
+            $extraAllocations = 3;
+        }
+        
+        $hexIDs = explode("x", $hexes);
+            
+        //check each tile. If it has no resources chosen, throw an error
+        //if it has many, throw an error if the number extra chosen exceeds extraAllocations
+        foreach($playerTiles as $tile)
+        {
+            $tileID = $tile['tile_id'];
+            $myrmesTile = new Tile($tile, $this->playerTileTypes, $this->sharedTileTypes);
+            
+            if ($myrmesTile->getTileCategory() == "tunnel")
+            {
+                continue;
+            }
+            
+            $resSelectedCount = 0;
+            
+            for ($i=$myrmesTile->Size;$i>0;$i--)
+            {
+                
+                if (in_array($myrmesTile->getHexID($i), $hexIDs))
+                {
+                    $resSelectedCount++;
+                }
+            }  
+            
+            if ($myrmesTile->hasResources() && $resSelectedCount == 0)
+            {
+                self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                    array('errMsg'=>'You must select a cube from all tiles ')           
+                );  
+                return;                
+            }
+            else if ($resSelectedCount > 1)
+            {
+                if ($myrmesTile->isScavengingTile())
+                {
+                    self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                        array('errMsg'=>'Harvest +3 cannot be used on scavenging tile')           
+                    );  
+                    return;
+                }
+                    
+                $extraAllocations -= ($resSelectedCount-1);
+                if ($extraAllocations < 0)
+                {
+                    if ($selectedEvent == $this->eventHarvest)
+                    {
+                        self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                            array('errMsg'=>'Only 3 extra cubes can be harvested')           
+                        );  
+                        return;
+                    }
+                    else
+                    {
+                        self::notifyPlayer( self::getCurrentPlayerId(), "tilePlacementInvalid", "", 
+                            array('errMsg'=>'Only one resource can be collected from each tile ')           
+                        );  
+                        return;
+                    }
+                }                
+            }
+        }
+        
+        //passed! save to DB but do NOT update screen until all players have chosen
+        //maybe leave the tiles highlighted in some way instead of clearing?
+        //this would also require working from game load state though...
+        
+        foreach($playerTiles as $tile)
+        {
+            $tileID = $tile['tile_id'];
+            $myrmesTile = new Tile($tile, $this->playerTileTypes, $this->sharedTileTypes);
+            
+            if ($myrmesTile->getTileCategory() == "tunnel")
+            {
+                continue;
+            }       
+            
+            $harvestSelected = 0;
+            
+            for ($i=$myrmesTile->Size;$i>0;$i--)
+            {
+                if (in_array($myrmesTile->getHexID($i), $hexIDs))
+                {
+                    $harvestSelected += pow(2, ($i-1));             
+                }
+            }
+            
+            $sql = "update tiles set selected_harvest_hexes = '".$harvestSelected."' where tile_id = '".$tileID."'";
+            self::DbQuery( $sql );            
+        }
+              
         $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");
     }
-    
-    function storageChosen(){
+       
+    function onStorageDiscard($resType){
+        
+        self::checkAction( 'discard' );
+        
         $currentPlayerID = self::getCurrentPlayerId();
-        $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");
+                
+        $res_name = "null";
+        
+        if ($resType == "FOOD")
+        {
+            $res_name = $this->resourceNames["food"];
+            $this->incPlayerVariable("player_food", $currentPlayerID, -1);
+        }
+        if ($resType == "DIRT")
+        {
+            $res_name = $this->resourceNames["dirt"];
+            $this->incPlayerVariable("player_dirt", $currentPlayerID, -1);
+        }
+        if ($resType == "STONE")
+        {
+            $res_name = $this->resourceNames["stone"];
+            $this->incPlayerVariable("player_stone", $currentPlayerID, -1);
+        }
+        
+        //todo - notify everyone
+        self::notifyAllPlayers( "discard", clienttranslate( '${player_name} discards 1 ${res_name}' ), array(
+            'player_name' => self::getCurrentPlayerName(),
+            'player_id' => $currentPlayerID,
+            'foodCount'=> $this->getPlayerVariable('player_food', $currentPlayerID),
+            'dirtCount'=> $this->getPlayerVariable('player_dirt', $currentPlayerID),
+            'stoneCount'=> $this->getPlayerVariable('player_stone', $currentPlayerID),
+            'res_name'=>$res_name
+        ) );
+        
+        //do they need to discard more?
+        if (!$this->colonyStorageExceeded($currentPlayerID))
+        {
+            $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");
+        }
     }
     
     function allocateNurseFinished(){
         
-        //todo - notify all players who has finished, might encourage them to speed up
+        //notify all players who has finished, might encourage them to speed up
         //also, when this notification gets to the active player, deactivate their stuff
+        
+        self::checkAction( 'finished' );
         
         $currentPlayerID = self::getCurrentPlayerId();
                       
@@ -1002,7 +1921,6 @@ class akMyrmes extends Table
             array()
         );
         
-        // Notify all players about the card played
         self::notifyAllPlayers( "nursesAllocated", clienttranslate( '${player_name} has chosen an event and finished allocating nurses' ), array(
             'player_name' => self::getCurrentPlayerName()
         ) );
@@ -1010,13 +1928,14 @@ class akMyrmes extends Table
         $this->gamestate->setPlayerNonMultiactive( $currentPlayerID, "");        
     }
     
-    function pass(){
-        
-        $test = akUtils::getPlayerVariable('player_nurses', self::getCurrentPlayerId());
-        //var_dump($test);
-        die('ok');        
-        
-        
+    function onMultiPass()
+    {
+        self::checkAction( 'pass' );
+        $this->gamestate->setPlayerNonMultiactive( self::getCurrentPlayerId(), "");
+    }
+    
+    function pass(){ 
+        self::checkAction( 'pass' );
         $this->gamestate->nextstate("pass");             
     }
 
@@ -1057,6 +1976,177 @@ class akMyrmes extends Table
         game state.
     */
     
+    function argPlaceTunnel()
+    {
+        $playerId = $this->getActivePlayerId();
+        
+        //return all spaces empty & adjacent to a player owned tile
+        $result = array();
+        $result["validTunnelSpaces"] = array();
+        
+        //$sql = "select tile_id,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6 from tiles where player_id='".self::getActivePlayerId()."'";
+        //$tiles = self::getCollectionFromDb($sql);
+        
+        $sql = "select tile_id, type_id, player_id, location, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6 from tiles where player_id='".$playerId."'";
+        $playerTiles = self::getCollectionFromDb($sql);
+        
+        $sql = "select tile_id, type_id, player_id, location, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6 from tiles";
+        $allTiles = self::getCollectionFromDb($sql);
+                      
+                
+        $hexGrid = new MyrmesHexGrid($this->boardSpaces, $allTiles, $this->getGameStateValue("player_count"), 0, $playerId);
+                
+        foreach($playerTiles as $tile)
+        {
+            for ($i=1; $i<=6; $i++)
+            {
+                $x = $tile["x".$i];
+                $y = $tile["y".$i];
+
+                if ($x != 0 && $y != 0)
+                {
+                    //get the adjacent tiles  
+                    $neighbours = $hexGrid->GetNeighbours($x, $y);
+                    
+                    foreach($neighbours as $neighbour)
+                    {
+                        //need to reject the ones with any tileID
+                        if ($neighbour["nodeTileID"] == 0)
+                        {                            
+                            $result["validTunnelSpaces"][] = $neighbour["x"]."_".$neighbour["y"];
+                        }
+                    }                    
+                }
+            }            
+        }
+        
+        return $result;
+    }
+    
+    function argAtelier()
+    {
+        //return to active player all valid atelier actions not yet performed
+        
+        $result = array();
+        $result["convertLarvae"] = false;
+        $result["atelierActions"] = array();
+        $playerID = self::getActivePlayerId();
+                
+        
+        //todo - can't use same one twice
+        
+        //level up (requirements vary by current level)
+        $currentLevel = $this->getPlayerVariable('player_colony_level', $playerID);
+        $atelierUsed = $this->getPlayerVariable('player_atelier_used', $this->getActivePlayerId());
+        $dirt = $this->getPlayerVariable('player_dirt', $playerID);
+        $stone = $this->getPlayerVariable('player_stone', $playerID);
+        
+        //todo - objective completion
+        if ($atelierUsed >=8)
+        {
+            $atelierUsed -= 8;
+        }
+        else
+        {
+     
+        }
+        
+        if ($atelierUsed >=4)
+        {
+            $atelierUsed -=4;
+        }
+        else
+        {
+            //new tunnel (if they aren't all placed and 1+ available adjacent hex)
+            $sql = "select * from tiles where type_id=1 and player_id = '".$playerID."' and location != 'board'";
+            $availableTunnels = $this->getCollectionFromDb($sql);
+        
+            if (count($availableTunnels) > 0)
+            {
+                $result["atelierActions"][] = "tunnel";
+            }
+        }
+        
+        if ($atelierUsed >= 2)
+        {
+            $atelierUsed -= 2;
+        }
+        else
+        {
+            if ($currentLevel == 0 && $dirt >= 2)
+            {
+                $result["atelierActions"][] = "level";
+            }
+            else if ($currentLevel == 1 && $dirt >= 2 && $stone >= 1)
+            {
+                $result["atelierActions"][] = "level";
+            }       
+            else if ($currentLevel == 1 && $dirt >= 2 && $stone >= 1)
+            {
+                $result["atelierActions"][] = "level";
+            }             
+        }
+        
+        if ($atelierUsed >= 1)
+        {
+            $atelierUsed -=1;
+        }
+        else
+        {
+            //create new nurse (2f + 2l)
+            $food = $this->getPlayerVariable('player_food', $playerID);
+            $larvae = $this->getPlayerVariable('player_larvae', $playerID);
+            
+            $nursesUsed = $this->getPlayerVariable('player_nurses', $playerID);
+            //TODO - count objective nurse uses also
+            
+            if ($food >= 2 && $larvae >= 2 && $nursesUsed < $this->maxNurseCount)
+            {
+                $result["atelierActions"][] = "nurse";
+            }             
+            
+            if ($food < 2 && $larvae >= 3)
+            {
+                $result["convertLarvae"] = true;
+            }
+        }
+               
+        return $result;
+    }
+    
+    function argMultiTile()
+    {
+        //send the ids of tiles in board_temp to choose from
+        $result = array();
+        
+        $sql = "select type_id from tiles where location = 'board_temp'";
+        $tiles = self::getObjectListFromDb($sql, true);
+        
+        //split type 9 into 9a and 9b
+        if (in_array(9, $tiles))
+        {
+            if(($key = array_search(9, $tiles)) !== false) {
+                unset($tiles[$key]);
+            }
+            
+            $foodCount = $this->getPlayerVariable('player_food', self::getActivePlayerId());
+            $stoneCount = $this->getPlayerVariable('player_stone', self::getActivePlayerId());
+            
+            if ($foodCount > 0)
+            {
+                array_push($tiles,"9b");   
+            }
+            if ($stoneCount > 0)
+            {
+                array_push($tiles,"9a");   
+            }                     
+        }
+        
+        $result["tileTypes"] = array_values($tiles);
+        $result["color"] = $this->getPlayerVariable('player_color_name', self::getActivePlayerId());
+        return $result;
+    }
+    
     function argPlaceTile()
     {
         //player chose to place a tile. Picks hexes and confirms
@@ -1066,8 +2156,14 @@ class akMyrmes extends Table
         //make everything valid within 3 hexes clickable
         $x = $this->getGameStateValue("active_worker_x");
         $y = $this->getGameStateValue("active_worker_y");
+        
+        $sql = "select tile_id, type_id, player_id, location, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6 from tiles ";
+        $tiles = self::getCollectionFromDb($sql);
                       
-        $searchNodeData = new MyrmesHexGrid($this->boardSpaces);
+        $playerId = $this->getActivePlayerId();
+        $soldierCount = $this->getPlayerVariable("player_soldiers", $playerId);
+        
+        $searchNodeData = new MyrmesHexGrid($this->boardSpaces, $tiles, $this->getGameStateValue("player_count"), $soldierCount, $playerId);
     
         $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
         
@@ -1075,7 +2171,32 @@ class akMyrmes extends Table
         $result["hexes"] = array();
         foreach($moves as $move)
         {
-            $result["hexes"][] = "hex_".$move->X."_".$move->Y;
+            //don't include current space
+            if ($x != $move->X || $y != $move->Y)
+            {
+                //don't include existing tiles
+                $found = false;
+                foreach($tiles as $tile)
+                {
+                    if (!$found && $tile["location"] == "board" &&
+                            (
+                            ($tile["x1"] == $move->X && $tile["y1"] == $move->Y) ||
+                            ($tile["x2"] == $move->X && $tile["y2"] == $move->Y) ||
+                            ($tile["x3"] == $move->X && $tile["y3"] == $move->Y) ||
+                            ($tile["x4"] == $move->X && $tile["y4"] == $move->Y) ||
+                            ($tile["x5"] == $move->X && $tile["y5"] == $move->Y) ||
+                            ($tile["x6"] == $move->X && $tile["y6"] == $move->Y)
+                            )
+                       )
+                    {
+                        $found = true;
+                    }
+                }
+                if (!$found)
+                {
+                    $result["hexes"][] = $move->X."_".$move->Y;
+                }
+            }
         }
         return $result;
     }
@@ -1086,7 +2207,7 @@ class akMyrmes extends Table
         //This one will be complicated.
         //If on an empty hex, can move to an adjacent hex
         //If on a special tile, can move to any hex adjacent to any space on the pheromone
-        //TODO - check on boiteajeux about moving on specil tiles and opposition special tiles.
+        //TODO - check on boiteajeux about moving on special tiles and opposition special tiles.
         //Can't move through water
         //Can't move off board
         //Can't move onto enemy tunnels
@@ -1095,31 +2216,56 @@ class akMyrmes extends Table
         
         $x = $this->getGameStateValue("active_worker_x");
         $y = $this->getGameStateValue("active_worker_y");
+        
+        $sql = "select tile_id, type_id, player_id, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6 from tiles ";
+        $tiles = self::getCollectionFromDb($sql);
+        
+        $playerId = $this->getActivePlayerId();
+        $soldierCount = $this->getPlayerVariable("player_soldiers", $playerId);
                       
-        $searchNodeData = new MyrmesHexGrid($this->boardSpaces);
+        $searchNodeData = new MyrmesHexGrid($this->boardSpaces, $tiles, $this->getGameStateValue("player_count"), $soldierCount, $playerId);
                
         $result = array();
         $result["moves"]= $this->getGameStateValue('active_worker_moves');
+        $result["canClearPheromone"] = false;
         $result["validMoves"] = array();
         
         if ((int)$result["moves"] > 0)
         {
-            $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 2);
+            $moves = akPathfinding::FindAllDestinations($x, $y, $searchNodeData, 1);
         
             foreach($moves as $move)
             {
-                $result["validMoves"][] = "hex_".$move->X."_".$move->Y;
+                $result["validMoves"][] = $move->X."_".$move->Y;
             }
         }
         
-        $tilePlacements = $this->getTilePlacements(true);
+        //if the current tile is not empty, no tile can be placed.
+        $match = $this->getTileByXY($x,$y);        
+        if ($match != false)
+        {
+            $result["canPlaceTile"] = 0;
+            
+            //can we clear a pheromone?
+            if ($match["type_id"] > 1 && $match["type_id"] < 9 && $this->getPlayerVariable('player_dirt', $playerId) >=1)
+            {
+                if ($match["res1"] == "" && $match["res2"] == "" && $match["res3"] == "" && $match["res4"] == "" && $match["res5"] == "" && $match["res6"] == "")
+                {
+                    $result["canClearPheromone"] = true;
+                }                
+            }            
+        }
+        else
+        {
+            //TODO - I don't think this is considering colony level or supplies
+            $tilePlacements = $this->getTilePlacements(true);
+            $result["canPlaceTile"] = count($tilePlacements) > 0;            
+        }       
         
-        $result["canPlaceTile"] = count($tilePlacements) > 0;
-        
-        return $result;
-    
+        return $result;    
     }
     
+    //TODO - move to MyrmesHexGrid class
     function isValidTilePlacement($hexVectors, $xOrigin, $yOrigin)
     {
         //todo - also check for existing tiles, bugs, etc
@@ -1159,8 +2305,7 @@ class akMyrmes extends Table
         
         //- tiles the player has in storage are valid
         //- TODO get generic tiles that are shared also
-        //- TODO do not return tiles this player isn't a high enough level to use
-        
+                
         $x = $this->getGameStateValue("active_worker_x");
         $y = $this->getGameStateValue("active_worker_y");
         
@@ -1168,42 +2313,21 @@ class akMyrmes extends Table
         //if we aren't, check all tiles.
         if ($returnFirstMatch)
         {
-            $sql = "select distinct type_id from tiles where location = 'storage' and player_id = '".self::getActivePlayerId()."'";
+            $sql = "select distinct type_id from tiles where type_id > 1 and location = 'storage' and (player_id='' OR player_id = '".self::getActivePlayerId()."')";
         }
         else
         {
-            //all player tile types
-            $sql = "select distinct type_id from tiles where type_id < 9";
+            //all placable tile types
+            $sql = "select distinct type_id from tiles where type_id < 11 and type_id > 1";
         }
         
-        $pheromoneTypes = self::getCollectionFromDb($sql);
+        $tileTypes = self::getCollectionFromDb($sql);
                         
-        //2 = X.X [0 0, +1 0]
-        //3 = X.X [0 0, +1 0, 0 +1]
-        //     X 
-        //4 = X.X.X
-        //
-        //     X
-        //5 = X.X
-        //     X
-        //6 = X.X.X
-        //     X
-        //7 = X.X.X
-        //     X.X
-        //8 = X.X.X
-        //     X.X
-        //      X
-        //var_dump($pheromoneTypes);
                         
-        foreach($pheromoneTypes as $pheromoneType)
+        foreach($tileTypes as $tileType)
         {
-            $type_id = $pheromoneType["type_id"];           
-                       
-            if ($type_id == "1")
-            {
-                continue; //don't want tunnels
-            }
-            
+            $type_id = $tileType["type_id"];  
+                                              
             $hexes = array();
             $flippedHexes = array();
                         
@@ -1212,7 +2336,7 @@ class akMyrmes extends Table
                 $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0));                
             }
             
-            if ($type_id == "3")
+            if ($type_id == "3" || $type_id == "9")
             {
                 $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>0, "y"=>1));
             }
@@ -1222,27 +2346,27 @@ class akMyrmes extends Table
                 $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0));
             }
             
-            if ($type_id == "5")
+            if ($type_id == "5" || $type_id == "10")
             {
-                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>-1));
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1));
             }
             
             //types 6 and 7 require mirror flipped versions
             if ($type_id == "6")
             {
-                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1));
-                $flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>-1));
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>2, "y"=>-1));
+                $flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>1));
             }
             
             if ($type_id == "7")
             {
-                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1));
-                $flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>-1), array("x"=>2, "y"=>-1));
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>1, "y"=>-1), array("x"=>2, "y"=>-1));
+                //$flippedHexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1));
             }
             
             if ($type_id == "8")
             {
-                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>1, "y"=>0), array("x"=>2, "y"=>0), array("x"=>0, "y"=>1), array("x"=>1, "y"=>1), array("x"=>0, "y"=>2));
+                $hexes = array(array("x"=> 0, "y"=>0), array("x"=>-1, "y"=>1), array("x"=>0, "y"=>1), array("x"=>-2, "y"=>2), array("x"=>-1, "y"=>2), array("x"=>0, "y"=>2));
             }
             
             //check twice, once for regular orientation and a second time for mirror flip.
@@ -1284,7 +2408,7 @@ class akMyrmes extends Table
 
                             if ($isValid)
                             {
-                                $match = new TileData($rotatedHexes, $i, $pheromoneType["type_id"], $m==1);
+                                $match = new TileData($rotatedHexes, $i, $tileType["type_id"], $m, $hex);
                                 $tilePlacements[] = $match;
                                 
                                 if ($returnFirstMatch)
@@ -1306,6 +2430,12 @@ class akMyrmes extends Table
         $player_id = self::getActivePlayerId();
         $colonyUsed = $this->getPlayerVariable('player_colony_used', $player_id);
         $colonyLevel = $this->getPlayerVariable('player_colony_level', $player_id);
+        
+        $chosenEvent = $this->getPlayerVariable('player_event_selected', self::getActivePlayerId());            
+        if ($chosenEvent == $this->eventLevel)
+        {
+            $colonyLevel++;
+        }
         
         $result['availableColony'] = array();
         if ($colonyUsed % 2 < 1)
@@ -1334,7 +2464,7 @@ class akMyrmes extends Table
         foreach($tunnels as $tunnel)
         {
             //todo - maybe some hex ids?
-            $result["tunnels"][] = "hex_".$tunnel["x1"]."_".$tunnel["y1"];
+            $result["tunnels"][] = $tunnel["x1"]."_".$tunnel["y1"];
         }
         
         return $result;
@@ -1367,6 +2497,69 @@ class akMyrmes extends Table
                 
         return array("event" => $current_event, "_private" => $privateInfos);
     }
+    
+    function argHarvest(){
+        
+        $privateInfos = array();
+        
+        //calculate which hexes the player can allocate, and which ones they can deallocate
+        //return only this list
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            $private = $this->getPlayerHarvestAllocations($player['player_id']);
+                        
+            $privateInfos[$player['player_id']] = $private;
+        }
+                
+        return array("_private" => $privateInfos);
+    }
+    
+    function argWinter(){
+        
+        $privateInfos = array();
+        
+        //calculate which hexes the player can allocate, and which ones they can deallocate
+        //return only this list
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            $actions = array();
+            $actions[] = "pass";
+            $larvae = $this->getPlayerVariable("player_larvae", $player['player_id']);
+            if ($larvae >= 3)
+            {
+                $actions[] = "convertLarvae";
+            }
+                        
+            $privateInfos[$player['player_id']] = $actions;
+        }
+                
+        return array("_private" => $privateInfos);
+    }
+    
+    function argStorage(){
+        
+        $privateInfos = array();
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            $private = array();
+            $private["foodCount"] = $player['player_food'];
+            $private["dirtCount"] = $player['player_dirt'];
+            $private["stoneCount"] = $player['player_stone'];
+                        
+            $privateInfos[$player['player_id']] = $private;
+        }
+                
+        return array("_private" => $privateInfos);
+    }
 
 //////////////////////////////////////////////////////////////////////////////
 //////////// Game state actions
@@ -1384,9 +2577,17 @@ class akMyrmes extends Table
     }
     
     function stWorkerUsed(){
-        //TODO
         //remove a worker from the active player. Make sure this updates in all UIs and current
         //game state.
+        $this->setGameStateValue("active_worker_x", 0);
+        $this->setGameStateValue("active_worker_y", 0);
+        $this->setGameStateValue("active_worker_flag", 0);
+        $this->incPlayerVariable('player_workers', self::getActivePlayerId(), -1);
+        self::notifyAllPlayers( "pause", "", array() ); 
+        self::notifyAllPlayers( "activeWorkerRemoved", "", array(
+                'player_id' => self::getActivePlayerId(),
+                'workers' => $this->getPlayerVariable('player_workers', self::getActivePlayerId())
+        ) ); 
         
         $this->gamestate->nextState("");
     }
@@ -1400,6 +2601,111 @@ class akMyrmes extends Table
                 'player_name' => $this->getPlayerVariable('player_name', self::getActivePlayerId())
         ) ); 
         
+        $this->gamestate->nextstate('');
+    }
+    
+    function stProcessHarvest() {
+        //execute harvest!
+        //give all players the resources they chose, make sure this gets animated
+        //resource limit not applied till after atelier
+        
+        $players = self::loadPlayersBasicInfos();
+        foreach($players as $player)
+        {
+            $playerID = $player['player_id'];
+            
+            $sql = "SELECT * FROM tiles where player_id = '".$playerID."' and location='board'";
+            $playerTiles = self::getCollectionFromDB( $sql );
+            
+            //allocate all chosen resources
+            foreach($playerTiles as $tile)
+            {
+                $tileID = $tile['tile_id'];
+                
+                $myrmesTile = new Tile($tile, $this->playerTileTypes, $this->sharedTileTypes);
+                
+                //if this is a colony tile, you get 2VP
+                if ($myrmesTile->isSubColony())
+                {
+                    $points = 2;
+                    if ($points > 0 && $this->isVPBonusActive($playerID))
+                    {
+                        $points++;
+                    }
+        
+                    $this->incPlayerVariable('player_score', $playerID, $points);
+                    self::notifyAllPlayers( "harvest", clienttranslate( '${player_name} harvests 2 ${resource_name}' ), array(
+                        'player_name' => $player['player_name'],
+                        'player_id' => $player['player_id'],
+                        'resource_name' => $this->resourceNames["vp"],
+                        'hex_id' => $tileID,
+                        'foodCount' => $this->getPlayerVariable('player_food', $playerID),
+                        'dirtCount' => $this->getPlayerVariable('player_dirt', $playerID),
+                        'stoneCount' => $this->getPlayerVariable('player_stone', $playerID),
+                    ) );                     
+                }
+                
+                //identify resource. Delete from resn in tiles table.
+                //animate/move resx_y from board to player + delete. Increment resource count
+                //todo - updates in colony
+                
+                $harvestHexes = $myrmesTile->getHarvestHexes();
+                
+                foreach($harvestHexes as $harvestHex)
+                {
+                    $index = $harvestHex[0];
+                    $resource = $harvestHex[1];
+                            
+                    $sql = "update tiles set res".$index." = '' where tile_id = '".$tileID."'";
+                    self::DbQuery($sql);
+                                
+                    if ($resource == "FOOD")
+                    {
+                        $this->incPlayerVariable('player_food', $playerID, 1);
+                    }
+                    if ($resource == "DIRT")
+                    {
+                        $this->incPlayerVariable('player_dirt', $playerID, 1);
+                    }
+                    if ($resource == "STONE")
+                    {
+                        $this->incPlayerVariable('player_stone', $playerID, 1);
+                    }
+                    
+                    $resNameLower = strtolower($resource);
+             
+                    self::notifyAllPlayers( "harvest", clienttranslate( '${player_name} harvests 1 ${resource_name}' ), array(
+                        'player_name' => $player['player_name'],
+                        'player_id' => $player['player_id'],
+                        'resource_name' => $this->resourceNames[$resNameLower],
+                        'hex_id' => $index."_".$tileID,
+                        'foodCount' => $this->getPlayerVariable('player_food', $playerID),
+                        'dirtCount' => $this->getPlayerVariable('player_dirt', $playerID),
+                        'stoneCount' => $this->getPlayerVariable('player_stone', $playerID),
+                    ) );                     
+                }
+            }           
+        }
+        
+        //now we remove any unpicked dirt/stone from scavenging tiles
+        $sql = "select tile_id,x1,y1,x2,y2,x3,y3 from tiles where subtype_id='9b' and location='board'";
+        $scavengingTiles = self::getCollectionFromDb($sql);
+        foreach($scavengingTiles as $scavengingTile)
+        {
+            //var_dump($scavengingTile);
+            $sql = "update tiles set res1='',res2='' where tile_id='".$scavengingTile["tile_id"]."'";           
+            self::DbQuery($sql);
+            
+            $sql = "select tile_id,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,res1,res2,res3,res4,res5,res6 from tiles where tile_id='".$scavengingTile["tile_id"]."'";           
+            $tile = self::GetObjectFromDb($sql);
+            
+            //remove them from the board
+            self::notifyAllPlayers( "resourcesDestroyed", '', array(
+                'tile' => $tile,                
+            ));           
+        }   
+        
+        $this->setGameStateValue("progress_indicator", 3);
         $this->gamestate->nextstate('');
     }
     
@@ -1436,10 +2742,10 @@ class akMyrmes extends Table
         $currentYear = $this->getGameStateValue('current_year');
         $currentSeason = $this->getGameStateValue('current_season');
         
-        self::notifyAllPlayers( "season", clienttranslate( 'SEASON ${season} of year ${year}. The event is ${eventname}' ), array(
+        self::notifyAllPlayers( "season", clienttranslate( '${season} of year ${year}. The event is ${eventname}' ), array(
             'year' => $currentYear,
-            'season'=>$currentSeason,
-            'eventname'=>"EVENTNAME"
+            'season'=> $this->seasonNames[$currentSeason],
+            'eventname'=> $this->events[$currentEvent]["name"]
         ) ); 
                 
         $this->gamestate->nextstate('');
@@ -1478,7 +2784,7 @@ class akMyrmes extends Table
             {
                 $larvaeGain = 5;
             }
-            if ($larvaeGain > 0 && $chosenEvent == 2) //TODO - use constant
+            if ($larvaeGain > 0 && $chosenEvent == $this->eventLarvae)
             {
                 $larvaeGain += 2;
             }
@@ -1489,6 +2795,8 @@ class akMyrmes extends Table
             
             //birth soldiers
             $soldiers = $player['player_soldiers'];
+            $workers = $player['player_workers'];
+            
             $soldiersAllocated = $player['player_soldier_slots_allocated'];
             $soldierGain = 0;
             if ($soldiersAllocated == 2)
@@ -1499,9 +2807,16 @@ class akMyrmes extends Table
             {
                 $soldierGain = 2;
             }
-            if ($soldierGain > 0 && $chosenEvent == 5) //TODO - use constant
+            if ($soldierGain > 0 && $chosenEvent == $this->eventSoldier)
             {
                 $soldierGain += 1;
+            }
+            
+            $soldierWorkerExcess = 0;
+            while (($soldiers + $soldierGain + $workers) > $this->maxWorkerCount)
+            {
+                $soldierWorkerExcess++;
+                $soldierGain--;
             }
             
             $soldiers += $soldierGain;
@@ -1520,10 +2835,18 @@ class akMyrmes extends Table
             {
                 $workerGain = 2;
             }
-            if ($workerGain > 0 && $chosenEvent == 7) //TODO - use constant
+            if ($workerGain > 0 && $chosenEvent == $this->eventWorker)
             {
                 $workerGain += 1;
             }
+            
+            
+            while (($soldiers + $workerGain + $workers) > $this->maxWorkerCount)
+            {
+                $soldierWorkerExcess++;
+                $workerGain--;
+            }
+            
             
             $workers += $workerGain;
             $this->setPlayerVariable('player_workers', $player['player_id'], $workers);
@@ -1540,11 +2863,12 @@ class akMyrmes extends Table
             self::notifyAllPlayers( "eventChosen", clienttranslate( '${player_name} spends ${spent} larvae to trigger event ${eventName}' ), array(
                 'player_name' => $player['player_name'],
                 'spent' => $spent,
-                'eventName' => "SOME EVENT HERE",
+                'eventName' => $this->events[$chosenEvent]["name"],
                 'larvaeCount' => $larvae
             ) );
             
-            self::notifyAllPlayers( "birthLarvae", clienttranslate( '${player_name} births ${larvaeGain} larvae, ${soldierGain} soldiers, and ${workerGain} workers' ), array(
+            self::notifyAllPlayers( "birthing", clienttranslate( '${player_name} births ${larvaeGain} larvae, ${soldierGain} soldiers, and ${workerGain} workers' ), array(
+                'player_id' => $player['player_id'],
                 'player_name' => $player['player_name'],
                 'larvaeGain' => $larvaeGain,            
                 'larvaeCount' => $larvae,
@@ -1554,28 +2878,107 @@ class akMyrmes extends Table
                 'workerCount' => $workers
             ) );
             
+            if ($soldierWorkerExcess > 0)
+            {
+                self::notifyAllPlayers( "excessBirthing", clienttranslate( '${player_name} fails to birth ${soldierWorkerExcess} soldiers/workers due to running out of tokens' ), array(
+                    'player_id' => $player['player_id'],
+                    'player_name' => $player['player_name'],            
+                    'soldierWorkerExcess' => $soldierWorkerExcess
+                ) );
+            }
             self::notifyAllPlayers( "atelierAllocation", clienttranslate( '${player_name} sends ${atelierCount} nurses to the atelier' ), array(
                 'player_name' => $player['player_name'],
                 'atelierCount' => $atelierCount
             ) ); 
         }
         
+        $this->setGameStateValue("progress_indicator", 1);
         $this->gamestate->nextstate('');
     }
     
     function stBirths(){
         //entering the births state, set all players active
         $this->gamestate->setAllPlayersMultiactive();
+        $this->gamestate->nextstate('');
     }
     
     function stHarvest(){
-        //entering the births state, set all players active
+        
+        //any food/dirt tiles should be populated, so the player can choose 
+        $sql = "select tile_id,x1,y1,x2,y2,x3,y3,subtype_id from tiles where type_id='9' and location='board'";
+        $scavengingTiles = self::getCollectionFromDb($sql);
+        foreach($scavengingTiles as $scavengingTile)
+        {
+            //var_dump($scavengingTile);
+            if ($scavengingTile["subtype_id"] == "9b")
+            {
+                $sql = "update tiles set res1='DIRT',res2='STONE' where tile_id='".$scavengingTile["tile_id"]."'";
+            }
+            else
+            {
+                $sql = "update tiles set res1='FOOD' where tile_id='".$scavengingTile["tile_id"]."'";
+            }
+            self::DbQuery($sql);
+            
+            $sql = "select tile_id,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,res1,res2,res3,res4,res5,res6 from tiles where tile_id='".$scavengingTile["tile_id"]."'";           
+            $tile = self::GetObjectFromDb($sql);
+            
+            //place them on the board
+            self::notifyAllPlayers( "resourcesPlaced", '', array(
+                'tile' => $tile,                
+            ));   
+        }           
+        
         $this->gamestate->setAllPlayersMultiactive();
+        $this->setGameStateValue("progress_indicator", 2);
+        $this->gamestate->nextstate('');
     }
     
     function stStorage(){
-        //entering the births state, set all players active
         $this->gamestate->setAllPlayersMultiactive();
+        $this->setGameStateValue("progress_indicator", 4);
+        $this->gamestate->nextstate('');
+    }
+    
+    function stStorage2(){
+        //anybody who is within their storage limit gets set to inactive
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        foreach($players as $player)
+        {
+            if (!$this->colonyStorageExceeded($player['player_id']))
+            {
+                $this->gamestate->setPlayerNonMultiactive( $player['player_id'], "");
+            }
+        }        
+    }
+    
+    function stPreWinter(){
+        $this->gamestate->setAllPlayersMultiactive();
+        $this->setGameStateValue("progress_indicator", 5);
+        $this->gamestate->nextstate('');
+    }
+    
+    function stWinterFoodCheck(){
+        //anybody who has enough food for winter OR less than 3 larvae gets set to inactive
+        
+        $sql = "SELECT * FROM player ";
+        $players = self::getCollectionFromDb( $sql );
+        
+        $currentYear = $this->getGameStateValue('current_year');
+        
+        foreach($players as $player)
+        {
+            $larvae = (int)$player['player_larvae'];
+            $soldiers = (int)$player['player_soldiers'];
+            $foodRequired = 3 + $currentYear - $soldiers;
+            $foodAvailable = (int)$player['player_food'];
+            
+            if ($foodRequired <= $foodAvailable || $larvae < 3)
+            {
+                $this->gamestate->setPlayerNonMultiactive( $player['player_id'], "");
+            }
+        }        
     }
     
     function stNextAvailableNurse(){
@@ -1689,7 +3092,7 @@ class akMyrmes extends Table
                 $this->setPlayerVariable('player_food', $player['player_id'], 0);
                 $vploss = ($foodRequired - $foodAvailable)*3;
                 
-                $this->playerSubtractScore($player['player_id'], $vploss);
+                $this->incPlayerVariable("player_score", $player['player_id'], -$vploss);
                 
                 self::notifyAllPlayers( "colonyFed", clienttranslate( '${player_name} only has ${spent} food (${soldiers} soldiers) and loses ${vploss} VP' ), array(
                     'player_name' => self::getActivePlayerName(),
@@ -1715,6 +3118,12 @@ class akMyrmes extends Table
         
         //return workers from colony
         $sql = "update player set player_colony_used = 0";
+        self::DbQuery( $sql );
+        
+        $sql = "update player set player_atelier_used = 0";
+        self::DbQuery( $sql );
+        
+        $sql = "update tiles set selected_harvest_hexes = 0";
         self::DbQuery( $sql );
         
         //return nurses to board
@@ -1762,6 +3171,7 @@ class akMyrmes extends Table
         
         $this->setGameStateValue('current_year', $current_year);
         $this->setGameStateValue('current_season', $current_season);       
+        $this->setGameStateValue("progress_indicator", 0);
         
         if ($current_season == 4)
         {
