@@ -1,3 +1,3 @@
 <?php 
 // Please do not modify this file.
-$game_version_akmyrmes ="999999-9999";
+$game_version_aktestgame ="999999-9999";

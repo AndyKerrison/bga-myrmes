@@ -2,7 +2,7 @@
 /**
  *------
  * BGA framework: © Gregory Isabelli <gisabelli@boardgamearena.com> & Emmanuel Colin <ecolin@boardgamearena.com>
- * akMyrmes implementation : © Amdrew Kerrison <adesignforlife@gmail.com>
+ * AKTestgame implementation : © <Your name here> <Your email address here>
  * 
  * This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
  * See http://en.boardgamearena.com/#!doc/Studio for more information.
@@ -10,7 +10,7 @@
  *
  * material.inc.php
  *
- * akMyrmes game material description
+ * AKTestgame game material description
  *
  * Here, you can describe the material of your game with PHP variables.
  *   
@@ -18,6 +18,7 @@
  * are available everywhere in your game logic code.
  *
  */
+
 
 $this->defaultMovePoints = 3; //set back to 3 for release
 $this->initialColonyLevel = 0; //set back to 0 for release
@@ -321,7 +322,6 @@ $this->boardSpaces[2][14] = "STONE";
 $this->boardSpaces[3][14] = "GRASS";
 $this->boardSpaces[4][14] = "GRASS";
 $this->boardSpaces[5][14] = "STONE";
-        
 
 
 

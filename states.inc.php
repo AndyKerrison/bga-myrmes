@@ -2,7 +2,7 @@
 /**
  *------
  * BGA framework: © Gregory Isabelli <gisabelli@boardgamearena.com> & Emmanuel Colin <ecolin@boardgamearena.com>
- * akMyrmes implementation : © Andrew Kerrison <adesignforlife@gmail.com>
+ * AKTestgame implementation : © <Your name here> <Your email address here>
  *
  * This code has been produced on the BGA studio platform for use on http://boardgamearena.com.
  * See http://en.boardgamearena.com/#!doc/Studio for more information.
@@ -10,7 +10,7 @@
  * 
  * states.inc.php
  *
- * akMyrmes game states description
+ * AKTestgame game states description
  *
  */
 
@@ -61,11 +61,9 @@ $machinestates = array(
         "transitions" => array( "" => 2 )
     ),
     
-    // Note: ID=2 => your first state
-
-    2 => array(
+	2 => array(
         "name" => "event",
-        "action"=> "", //"stEvent",
+        "action"=> "stEvent",
         "type" => "game",
         "updateGameProgression" => true,
         "transitions" => array( "" => 4)
@@ -300,7 +298,7 @@ $machinestates = array(
         "descriptionmyturn" => clienttranslate('You may convert larvae into food to meet feeding requirements'),
         "args"=> "argWinter",
         "action" => "stWinterFoodCheck",
-        "possibleactions" => array( "pass", "convertLarvae"),
+        "possibleactions" => array( "pass", "larvae"),
         "updateGameProgression" => true,
         "transitions" => array("" => 52)
     ),
@@ -312,7 +310,8 @@ $machinestates = array(
         "updateGameProgression" => true,
         "transitions" => array("" => 45)
     ),
-      
+
+   
     // Final state.
     // Please do not modify.
     99 => array(
